@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ Thống Điều Hành Nhà Máy SmartFactory</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div id="login-screen" class="full-screen">
+        <div class="login-card">
+            <div class="factory-header">
+                <div class="logo-icon">🏭</div>
+                <h2>SMART FACTORY</h2>
+                <p>Hệ thống quản lý sản xuất v4.0</p>
+            </div>
+            <form id="login-form">
+                <div class="input-group">
+                    <label>Tài khoản</label>
+                    <input type="text" id="username" placeholder="admin, worker1, inspector..." required>
+                </div>
+                <div class="input-group">
+                    <label>Mật khẩu</label>
+                    <input type="password" id="password" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="btn btn-primary">KÍCH HOẠT HỆ THỐNG</button>
+            </form>
+            <p id="login-error" class="error-msg"></p>
+        </div>
+    </div>
+
+    <div id="dashboard-screen" class="dashboard-layout hidden">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <span class="logo-text">NHATVIET INDUSTRY</span>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-item active" data-tab="pending">
+                    <i class="fa-solid fa-clock"></i> Công việc đang chờ
+                </div>
+                <div class="nav-item" data-tab="processing">
+                    <i class="fa-solid fa-gears"></i> Công việc đang xử lý
+                </div>
+                <div class="nav-item" data-tab="pending-inspect">
+                    <i class="fa-solid fa-clipboard-check"></i> Sản phẩm đợi kiểm định
+                </div>
+                <div class="nav-item" data-tab="rejected">
+                    <i class="fa-solid fa-square-check"></i> Sản phẩm/công việc bị từ chối
+                </div>
+                <div class="nav-item hidden" id="admin-nav" data-tab="admin-panel">
+                    <i class="fa-solid fa-user-gear" style="color: #00f2fe;"></i> Quản lý tài khoản
+                </div>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <p id="user-display" class="highlight"></p>
+                    <span id="role-display"></span>
+                </div>
+                <button id="logout-btn" class="btn btn-danger-sm">Đăng xuất</button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="content-header">
+                <h1 id="tab-title">Công việc đang chờ</h1>
+                <div class="system-status">● HỆ THỐNG ỔN ĐỊNH</div>
+            </header>
+
+            <section class="task-container" id="task-list">
+                </section>
+
+            <section id="admin-panel" class="admin-section hidden">
+                <div class="admin-card">
+                    <h3>➕ Cấp Phát Tài Khoản & Phân Quyền Hệ Thống</h3>
+                    <form id="create-user-form">
+                        <div class="form-grid">
+                            <div class="input-group">
+                                <label>Tên tài khoản mới</label>
+                                <input type="text" id="new-user-name" placeholder="Ví dụ: worker2" required>
+                            </div>
+                            <div class="input-group">
+                                <label>Mật khẩu khởi tạo</label>
+                                <input type="password" id="new-user-pass" placeholder="••••••••" required>
+                            </div>
+                            <div class="input-group">
+                                <label>Vai trò áp dụng (Role)</label>
+                                <select id="new-user-role" class="modern-select">
+                                    <option value="worker1">Worker 1</option>
+                                    <option value="worker2">Worker 2</option>
+                                    <option value="worker3">Worker 3</option>
+                                    <option value="inspector">Inspector</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="width: auto; padding: 12px 30px;">KÍCH HOẠT TÀI KHOẢN</button>
+                    </form>
+                    <p id="admin-msg" class="success-msg"></p>
+                    <p id="admin-error" class="error-msg"></p>
+
+                    <hr class="divider" style="margin: 30px 0;">
+                    <h3>👥 Danh Sách Tài Khoản Trong Cơ Sở Dữ Liệu</h3>
+                    <div style="overflow-x: auto; margin-top: 15px;">
+                        <table class="user-table">
+                            <thead>
+                                <tr>
+                                    <th>Tên tài khoản</th>
+                                    <th>Quyền hạn (Role)</th>
+                                    <th>Hành động</th>
+                                </tr>
+                            </thead>
+                            <tbody id="user-table-body">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <footer class="content-footer">
+                <div class="password-section">
+                    <button id="toggle-pwd-btn" class="btn btn-link">⚙️ Thiết lập lại mật khẩu tài khoản</button>
+                    <div id="password-form-container" class="hidden-fields">
+                        <form id="change-pwd-form" class="inline-form">
+                            <input type="password" id="old-password" placeholder="Mật khẩu cũ" required>
+                            <input type="password" id="new-password" placeholder="Mật khẩu mới" required>
+                            <button type="submit" class="btn btn-secondary">Cập nhật</button>
+                        </form>
+                        <p id="pwd-msg" class="success-msg"></p>
+                    </div>
+                </div>
+            </footer>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

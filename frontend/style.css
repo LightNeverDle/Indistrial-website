@@ -1,0 +1,551 @@
+:root {
+    --bg-dark: #020617;
+    --sidebar-bg: #0f172a;
+    --main-content-bg: #020617;
+    --card-task: #1e293b;
+    --primary-neon: #00f2fe;
+    --accent-blue: #38bdf8;
+    --text-main: #f8fafc;
+    --text-muted: #64748b;
+    --error: #f43f5e;
+    --success: #10b981;
+    --border-color: #334155;
+    --input-bg: #0f172a;
+}
+
+* { 
+    box-sizing: border-box; 
+    margin: 0; 
+    padding: 0; 
+    font-family: 'Segoe UI', Roboto, sans-serif; 
+}
+
+body { 
+    background-color: var(--bg-dark); 
+    color: var(--text-main); 
+    overflow: hidden; 
+}
+
+.hidden { display: none !important; }
+
+/* =========================================
+   1. MÀN HÌNH ĐĂNG NHẬP (Fix lỗi mất CSS)
+   ========================================= */
+.full-screen {
+    height: 100vh;
+    width: 100vw;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: radial-gradient(circle at center, #1e1b4b 0%, #020617 100%);
+    position: fixed; /* Đảm bảo phủ toàn màn hình */
+    top: 0;
+    left: 0;
+    z-index: 1000;
+}
+
+.login-card {
+    background: var(--sidebar-bg);
+    padding: 40px;
+    border-radius: 15px;
+    border: 1px solid var(--border-color);
+    width: 100%;
+    max-width: 400px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 15px rgba(0, 242, 254, 0.1);
+}
+
+.factory-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.logo-icon {
+    font-size: 3rem;
+    margin-bottom: 10px;
+    filter: drop-shadow(0 0 10px var(--primary-neon));
+}
+
+.factory-header h2 {
+    font-size: 1.6rem;
+    color: #fff;
+    letter-spacing: 1px;
+}
+
+.factory-header p {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 5px;
+}
+
+/* CSS cho phần nhập liệu tài khoản/mật khẩu */
+.input-group {
+    margin-bottom: 20px;
+}
+
+.input-group label {
+    display: block;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.input-group input {
+    width: 100%;
+    padding: 12px 15px;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: #fff;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+.input-group input:focus {
+    outline: none;
+    border-color: var(--primary-neon);
+    box-shadow: 0 0 10px rgba(0, 242, 254, 0.3);
+}
+
+/* =========================================
+   2. LAYOUT DASHBOARD RỘNG
+   ========================================= */
+.dashboard-layout {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+}
+
+/* SideBar */
+.sidebar {
+    width: 280px;
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0; /* Không cho sidebar co lại */
+}
+
+.sidebar-header {
+    padding: 30px;
+    font-weight: bold;
+    font-size: 1.3rem;
+    color: var(--primary-neon);
+    letter-spacing: 2px;
+    border-bottom: 1px solid var(--border-color);
+    text-align: center;
+}
+
+.sidebar-nav {
+    flex-grow: 1;
+    padding: 20px 0;
+}
+
+.nav-item {
+    padding: 15px 30px;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    border-left: 4px solid transparent;
+}
+
+.nav-item i { width: 20px; text-align: center; }
+
+.nav-item:hover, .nav-item.active {
+    color: var(--primary-neon);
+    background: rgba(0, 242, 254, 0.05);
+}
+
+.nav-item.active {
+    border-left-color: var(--primary-neon);
+    font-weight: bold;
+}
+
+.sidebar-footer {
+    padding: 20px;
+    background: rgba(0,0,0,0.2);
+    border-top: 1px solid var(--border-color);
+}
+
+.user-info {
+    margin-bottom: 15px;
+}
+
+#user-display {
+    font-size: 1rem;
+}
+
+#role-display {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+/* Nội dung chính */
+.main-content {
+    flex-grow: 1;
+    padding: 40px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--main-content-bg);
+}
+
+.content-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.content-header h1 {
+    font-size: 1.8rem;
+    font-weight: 500;
+}
+
+.system-status {
+    color: var(--success);
+    font-size: 0.8rem;
+    font-weight: bold;
+    letter-spacing: 1px;
+    animation: blink 2s infinite;
+}
+
+/* Grid danh sách Task */
+.task-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    align-content: start; /* Grid bắt đầu từ top */
+    flex-grow: 1;
+}
+
+.task-card {
+    background: var(--card-task);
+    padding: 25px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    border-top: 3px solid var(--accent-blue);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.task-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+.task-card h3 { 
+    margin-bottom: 10px; 
+    font-size: 1.1rem; 
+    color: #fff;
+}
+
+.task-card p { 
+    font-size: 0.9rem; 
+    color: var(--text-muted); 
+    line-height: 1.5;
+}
+
+/* Footer & Đổi mật khẩu ở Dashboard */
+.content-footer {
+    margin-top: auto; /* Đẩy xuống đáy */
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+}
+
+.password-section {
+    background: rgba(255,255,255,0.02);
+    padding: 15px;
+    border-radius: 8px;
+}
+
+.inline-form {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+    flex-wrap: wrap;
+}
+
+.inline-form input {
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    padding: 10px;
+    border-radius: 4px;
+    color: #fff;
+    flex-grow: 1;
+}
+
+.inline-form input:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+}
+
+.hidden-fields { 
+    display: none; 
+}
+
+.hidden-fields.show { 
+    display: block; 
+    animation: slideDown 0.3s ease;
+}
+
+/* =========================================
+   3. BUTTONS & UTILITIES
+   ========================================= */
+.btn { 
+    cursor: pointer; 
+    border: none; 
+    border-radius: 6px; 
+    font-weight: bold; 
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    text-align: center;
+}
+
+/* Nút chính ở màn hình đăng nhập */
+.btn-primary { 
+    background: linear-gradient(135deg, #0072ff, var(--primary-neon)); 
+    color: #000; 
+    padding: 12px; 
+    width: 100%; 
+}
+
+.btn-primary:hover {
+    box-shadow: 0 0 15px rgba(0, 242, 254, 0.5);
+    transform: translateY(-1px);
+}
+
+/* Nút phụ */
+.btn-secondary { 
+    background: #334155; 
+    color: #fff; 
+    padding: 10px 20px; 
+    border: 1px solid #475569;
+}
+
+.btn-secondary:hover { background: #475569; }
+
+/* Nút đăng xuất nhỏ */
+.btn-danger-sm { 
+    background: transparent; 
+    border: 1px solid var(--error); 
+    color: var(--error); 
+    padding: 8px; 
+    font-size: 0.8rem; 
+    width: 100%; 
+}
+
+.btn-danger-sm:hover { 
+    background: var(--error); 
+    color: #fff; 
+}
+
+/* Nút dạng link */
+.btn-link { 
+    background: transparent; 
+    color: var(--text-muted); 
+    text-decoration: underline; 
+    font-size: 0.85rem; 
+    font-weight: normal;
+    padding: 0;
+}
+
+.btn-link:hover { color: var(--accent-blue); }
+
+.btn:active { transform: scale(0.98); }
+
+/* Messages */
+.error-msg { color: var(--error); font-size: 0.85rem; margin-top: 10px; text-align: center; }
+.success-msg { color: var(--success); font-size: 0.85rem; margin-top: 10px; text-align: center; }
+.highlight { color: var(--primary-neon); font-weight: bold; }
+
+/* Animations */
+@keyframes blink {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Custom Scrollbar cho main content */
+.main-content::-webkit-scrollbar { width: 8px; }
+.main-content::-webkit-scrollbar-track { background: var(--bg-dark); }
+.main-content::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+.main-content::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+/* Style cho bảng quản trị Admin */
+.admin-section {
+    width: 100%;
+    animation: slideDown 0.3s ease;
+}
+
+.admin-card {
+    background: var(--card-task);
+    border: 1px solid var(--border-color);
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.admin-card h3 {
+    color: var(--primary-neon);
+    margin-bottom: 20px;
+    font-size: 1.2rem;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+/* Biến đổi dropdown select theo style nhà máy tối giản */
+.modern-select {
+    width: 100%;
+    padding: 12px;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: #fff;
+    font-size: 1rem;
+    outline: none;
+    cursor: pointer;
+}
+
+.modern-select:focus {
+    border-color: var(--primary-neon);
+}
+
+.modern-select option {
+    background: var(--sidebar-bg);
+    color: #fff;
+}
+
+/* Style cho bảng danh sách tài khoản */
+.user-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    background: #0f172a;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.user-table th, .user-table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.user-table th {
+    background: #1e293b;
+    color: var(--primary-neon);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.user-table td {
+    font-size: 0.95rem;
+    color: #fff;
+}
+
+.user-table tr:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+/* Nút xóa tài khoản dạng nhỏ gọn */
+.btn-delete-task {
+    background: transparent;
+    border: 1px solid var(--error);
+    color: var(--error);
+    padding: 5px 12px;
+    font-size: 0.8rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-delete-task:hover {
+    background: var(--error);
+    color: #fff;
+}
+
+/* Card Task Nâng Cao */
+.task-card {
+    background: var(--card-task);
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    border-top: 3px solid var(--accent-blue);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.task-card:hover {
+    transform: translateY(-8px);
+    border-top-color: var(--primary-neon);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4), 0 0 10px rgba(0, 242, 254, 0.1);
+}
+
+/* Nút bấm chung */
+.btn {
+    cursor: pointer;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+/* 1. Nút Xác nhận (Primary Action) */
+.btn-confirm {
+    background: var(--primary-neon);
+    color: var(--bg-dark);
+    margin-top: 15px;
+}
+
+.btn-confirm:hover {
+    background: #fff;
+    box-shadow: 0 0 15px var(--primary-neon);
+}
+
+/* 2. Nút Hủy hoặc Phụ (Secondary Action) */
+.btn-secondary {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+}
+
+.btn-secondary:hover {
+    border-color: var(--text-muted);
+    background: var(--card-task);
+}
+
+/* 3. Nút Nguy hiểm/Xóa (Danger Action) */
+.btn-delete {
+    background: rgba(244, 63, 94, 0.1);
+    border: 1px solid var(--error);
+    color: var(--error);
+}
+
+.btn-delete:hover {
+    background: var(--error);
+    color: white;
+}
+
