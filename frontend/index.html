@@ -7,6 +7,23 @@
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
+<div id="detailModal" class="modal">
+
+    <div class="modal-content">
+
+        <span
+        class="close"
+        onclick="document.getElementById('detailModal').style.display='none'">
+        ×
+        </span>
+
+        <h2>Chi tiết phiếu lệnh</h2>
+
+        <div id="detailBody"></div>
+
+    </div>
+
+</div>
 <body>
     <div id="login-screen" class="full-screen">
         <div class="login-card">
@@ -122,9 +139,31 @@
                     <button id="toggle-pwd-btn" class="btn btn-link">⚙️ Thiết lập lại mật khẩu tài khoản</button>
                     <div id="password-form-container" class="hidden-fields">
                         <form id="change-pwd-form" class="inline-form">
-                            <input type="password" id="old-password" placeholder="Mật khẩu cũ" required>
-                            <input type="password" id="new-password" placeholder="Mật khẩu mới" required>
-                            <button type="submit" class="btn btn-secondary">Cập nhật</button>
+
+                            <input
+                                type="password"
+                                id="old-password"
+                                placeholder="Mật khẩu cũ"
+                                required>
+
+                            <input
+                                type="password"
+                                id="new-password"
+                                placeholder="Mật khẩu mới"
+                                required>
+
+                            <input
+                                type="password"
+                                id="confirm-password"
+                                placeholder="Nhập lại mật khẩu mới"
+                                required>
+
+                            <button
+                                type="submit"
+                                class="btn btn-secondary">
+                                Cập nhật
+                            </button>
+
                         </form>
                         <p id="pwd-msg" class="success-msg"></p>
                     </div>

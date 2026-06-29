@@ -1,11 +1,12 @@
 const API_URL = "http://127.0.0.1:8000/api";
 let authToken = null; 
 let currentUsername = null; // Lưu trữ username của người dùng đang đăng nhập
+let orderDetails = {};
 
 // Giữ nguyên mockdata của các mục khác
 const mockTasks = {
     processing: [
-        { id: 3, title: "Phiếu chuẩn bị vật tư sản xuất Ống Lỏng", desc: "Đang chạy trên máy CNC 01" }
+        { id: 3, title: "Phiếu chuẩn bị vật tư sản xuất Ống Lỏng", desc: "Đang chạy trên máy 01" }
     ],
     "pending-inspect": [
         { id: 4, title: "phiếu thông tin sản xuất Ống Lỏng", desc: "Chờ Inspector kiểm tra mạch điện" }
@@ -21,6 +22,24 @@ const taskList = document.getElementById("task-list");
 const adminPanel = document.getElementById("admin-panel");
 const tabTitle = document.getElementById("tab-title");
 const adminNav = document.getElementById("admin-nav");
+
+// Trả về nút phù hợp theo trạng thái đơn
+function renderStatusButton(group) {
+    const status = group.status || group.state || group.order_status || "Chờ";
+    const code = group.contract_code;
+
+    if (status === "Hoàn thành" || status.toLowerCase() === "completed") {
+        return `<button class="btn btn-complete btn-disabled" disabled>Hoàn thành</button>`;
+    }
+
+    if (status === "Đang xử lý" || status.toLowerCase() === "processing") {
+        // Cho phép chuyển từ Đang xử lý -> Hoàn thành
+        return `<button class="btn btn-processing" onclick='acceptOrder("${code}", "Đang xử lý")'>Đang xử lý → Hoàn thành</button>`;
+    }
+
+    // Mặc định: chưa nhận việc
+    return `<button class="btn btn-confirm" onclick='acceptOrder("${code}", "${status}")'>Nhận việc</button>`;
+}
 
 // 1. LOGIC CHUYỂN TAB ĐIỀU HƯỚNG
 document.querySelectorAll(".nav-item").forEach(item => {
@@ -58,6 +77,7 @@ async function renderRealOrders() {
         });
         
         const data = await response.json();
+        console.log(data);
         
         if (!response.ok) {
             taskList.innerHTML = `<p style="color:var(--error); text-align:center;">${data.detail || "Lỗi quyền truy cập"}</p>`;
@@ -71,33 +91,45 @@ async function renderRealOrders() {
             return;
         }
 
-        data.forEach(order => {
+        data.forEach(group => {
             const card = document.createElement("div");
             card.className = "task-card";
+            orderDetails[group.contract_code] = group.details;
             
-            // Nút hành động
-            const buttonHtml = order.status === 'Chưa xử lý' 
-                ? `<button class="btn btn-confirm" onclick="acceptOrder(${order.id})">✓ Nhận việc</button>` 
-                : `<button class="btn btn-secondary" disabled>Đã nhận</button>`;
-
             // Hiển thị đầy đủ thông tin
-            card.innerHTML = `
-                <h3 style="color: var(--primary-neon);">Phiếu lệnh sản xuất Ống Lỏng</h3>
-                <h3 style="color: var(--primary-neon);">#${order.id} - ${order.loose_tube_code}</h3>
-                <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 10px 0;">
-                <div style="font-size: 0.85rem; display: grid; gap: 5px;">
-                    <p><strong>Khách hàng:</strong> ${order.customer_name}</p>
-                    <p><strong>Hợp đồng:</strong> ${order.contract_code}</p>
-                    <p><strong>Ngày nhập:</strong> ${order.import_date}</p>
-                    <p><strong>Thông số:</strong> ${order.fiber_count} sợi | ${order.diameter}mm | ${order.tube_color}</p>
-                    <p><strong>Thời gian:</strong> ${order.start_time} - ${order.end_time}</p>
-                    <p><strong>Người vận hành:</strong> ${order.operator}</p>
-                    <p><strong>Ghi chú:</strong> ${order.notes || 'Không có'}</p>
-                    <p><strong>Trạng thái:</strong> <span class="highlight">${order.status}</span></p>
-                </div>
-                <div style="margin-top: 15px;">
-                    ${buttonHtml}
-                </div>
+            card.innerHTML=`
+
+            <h3 style="color:var(--primary-neon)">
+            📋 ${group.contract_code}
+            </h3>
+
+            <hr>
+
+            <p><b>Khách hàng:</b> ${group.customer_name}</p>
+
+            <p><b>Người lập:</b> ${group.requester}</p>
+
+            <p><b>Người duyệt:</b> ${group.approver}</p>
+
+            <p><b>Người vận hành:</b> ${group.operator}</p>
+
+            <p><b>Số sản phẩm:</b> ${group.product_count}</p>
+
+            <p><b>Ngày nhập:</b> ${group.import_date}</p>
+
+            <div style="margin-top:15px">
+
+            <button
+            class="btn btn-secondary"
+            onclick="showOrderDetail('${group.contract_code}')">
+            Chi tiết
+            </button>
+
+            <!-- Button hiển thị theo trạng thái -->
+            ${renderStatusButton(group)}
+
+            </div>
+
             `;
             taskList.appendChild(card);
         });
@@ -107,25 +139,43 @@ async function renderRealOrders() {
 }
 
 // Hàm gửi xác nhận trạng thái về cho DB Backend
-async function acceptOrder(orderId) {
-    try {
+async function acceptOrder(contractCode, currentStatus){
+    // Xác định trạng thái tiếp theo
+    let nextStatus = null;
+
+    const cs = (currentStatus || "").toString();
+    if (cs === "Hoàn thành" || cs.toLowerCase() === "completed") {
+        alert("Đơn hàng đã hoàn thành.");
+        return;
+    }
+
+    if (cs === "Đang xử lý" || cs.toLowerCase() === "processing") {
+        nextStatus = "Hoàn thành";
+    } else {
+        // Mặc định chuyển sang Đang xử lý khi nhận việc
+        nextStatus = "Đang xử lý";
+    }
+
+    try{
         const response = await fetch(`${API_URL}/update-order-status`, {
             method: "POST",
-            headers: { 
+            headers: {
                 "Content-Type": "application/json",
                 "Authorization": `Bearer ${authToken}`
             },
-            body: JSON.stringify({ order_id: orderId, status: "Đang xử lý" })
+            body: JSON.stringify({ contract_code: contractCode, status: nextStatus })
         });
+
         const result = await response.json();
+
         if (response.ok) {
-            alert("✓ " + result.message);
-            renderRealOrders(); // Nạp lại danh sách sau khi lưu thành công
+            alert(result.message || `Cập nhật trạng thái: ${nextStatus}`);
+            renderRealOrders();
         } else {
-            alert("❌ " + result.detail);
+            alert(result.detail || "Cập nhật thất bại.");
         }
-    } catch (err) {
-        alert("Lỗi đường truyền dữ liệu lên máy chủ.");
+    } catch (e) {
+        alert("Không thể kết nối server");
     }
 }
 
@@ -229,4 +279,214 @@ document.getElementById("logout-btn").addEventListener("click", (e) => {
     
     // 5. Làm mới lại trang để giải phóng bộ nhớ (Tùy chọn - An toàn hơn location.reload())
     window.location.href = window.location.pathname; 
+});
+
+function showOrderDetail(contractCode) {
+
+    const details = orderDetails[contractCode];
+
+    if (!details || details.length === 0) {
+        alert("Không có dữ liệu.");
+        return;
+    }
+
+    // Thông tin chung lấy từ sản phẩm đầu tiên
+    const info = details[0];
+
+    let html = `
+    <div class="order-info">
+
+        <div class="order-title">
+            <h2>📋 PHIẾU LỆNH SẢN XUẤT ỐNG LỎNG</h2>
+            <span>${info.contract_code}</span>
+        </div>
+
+        <div class="order-grid">
+
+            <div><b>Khách hàng</b><br>${info.customer_name}</div>
+
+            <div><b>Ngày nhập</b><br>${info.import_date}</div>
+
+            <div><b>Người lập</b><br>${info.requester}</div>
+
+            <div><b>Người duyệt</b><br>${info.approver}</div>
+
+            <div><b>Người vận hành</b><br>${info.operator}</div>
+
+            <div><b>Số sản phẩm</b><br>${details.length}</div>
+
+        </div>
+
+    </div>
+
+    <div class="table-container">
+
+    <table class="detail-table">
+
+        <thead>
+
+            <tr>
+
+                <th>STT</th>
+
+                <th>Mã LT</th>
+
+                <th>Màu ống</th>
+
+                <th>Số sợi</th>
+
+                <th>Đường kính</th>
+
+                <th>Chiều dài</th>
+
+                <th>Ngày SX</th>
+
+                <th>Thời gian</th>
+
+                <th>Trạng thái</th>
+
+            </tr>
+
+        </thead>
+
+        <tbody>
+    `;
+
+    details.forEach((item, index) => {
+
+        html += `
+
+        <tr>
+
+            <td>${index + 1}</td>
+
+            <td>${item.loose_tube_code}</td>
+
+            <td>${item.tube_color}</td>
+
+            <td>${item.fiber_count}</td>
+
+            <td>${item.diameter} mm</td>
+
+            <td>${item.length} m</td>
+
+            <td>${item.operation_date}</td>
+
+            <td>${item.start_time} - ${item.end_time}</td>
+
+            <td>
+
+                <span class="status-badge">
+
+                    ${item.status}
+
+                </span>
+
+            </td>
+
+        </tr>
+
+        `;
+
+    });
+
+    html += `
+
+        </tbody>
+
+    </table>
+
+    </div>
+
+    <div class="note-box">
+
+        <h3>📝 Ghi chú sản xuất</h3>
+
+        <p>${info.notes || "Không có ghi chú."}</p>
+
+    </div>
+    `;
+
+    document.getElementById("detailBody").innerHTML = html;
+
+    document.getElementById("detailModal").style.display = "flex";
+
+}
+
+const togglePwdBtn = document.getElementById("toggle-pwd-btn");
+const passwordFormContainer = document.getElementById("password-form-container");
+
+togglePwdBtn.addEventListener("click", () => {
+    passwordFormContainer.classList.toggle("hidden-fields");
+});
+
+const confirmPassword =
+document.getElementById("confirm-password").value;
+document.getElementById("change-pwd-form").addEventListener("submit", async (e) => {
+
+    e.preventDefault();
+
+    const oldPassword = document.getElementById("old-password").value;
+    const newPassword = document.getElementById("new-password").value;
+    const confirmPassword = document.getElementById("confirm-password").value;
+    const msg = document.getElementById("pwd-msg");
+    msg.textContent = "";
+
+    if (newPassword !== confirmPassword) {
+
+        msg.style.color = "#ef4444";
+
+        msg.textContent = "Mật khẩu nhập lại không khớp.";
+
+        return;
+
+    }
+
+    try{
+
+        const response = await fetch(`${API_URL}/change-password`,{
+
+            method:"POST",
+
+            headers:{
+                "Content-Type":"application/json",
+                "Authorization":`Bearer ${authToken}`
+            },
+
+            body:JSON.stringify({
+
+                old_password:oldPassword,
+
+                new_password:newPassword
+
+            })
+
+        });
+
+        const result = await response.json();
+
+        if(response.ok){
+
+            msg.style.color="#22c55e";
+
+            msg.textContent=result.message;
+
+            document.getElementById("change-pwd-form").reset();
+
+        }else{
+
+            msg.style.color="#ef4444";
+
+            msg.textContent=result.detail;
+
+        }
+
+    }catch(err){
+
+        msg.style.color="#ef4444";
+
+        msg.textContent="Không kết nối được máy chủ.";
+
+    }
+
 });

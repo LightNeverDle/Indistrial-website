@@ -1,5 +1,11 @@
 import os
 import sys
+import jwt
+from datetime import datetime, timedelta
+from fastapi import FastAPI, HTTPException, Header
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 # ==========================
 # Chuyển thư mục làm việc về Project/
@@ -11,20 +17,14 @@ os.chdir(PROJECT_ROOT)
 
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
-import jwt
-from datetime import datetime, timedelta
-
-from fastapi import FastAPI, HTTPException, Header
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
-
 from backend.database import db, pwd_context
 
 app = FastAPI(title="Secure Factory OS v4.0")
 
 SECRET_KEY = "FACTORY_PRO_MAX"
 ALGORITHM = "HS256"
+
+
 
 
 # ==========================
@@ -35,10 +35,13 @@ class LoginModel(BaseModel):
     username: str
     password: str
 
+class ChangePasswordModel(BaseModel):
+    old_password: str
+    new_password: str
 
 class UpdateStatusModel(BaseModel):
-    order_id: int
-    status: str
+    contract_code:str
+    status:str
 
 
 # ==========================
@@ -90,6 +93,36 @@ def verify_admin_token(authorization: str):
 # ==========================
 # LOGIN
 # ==========================
+
+@app.post("/api/change-password")
+def change_password(
+    data: ChangePasswordModel,
+    authorization: str = Header(None)
+):
+
+    payload = verify_token(authorization)
+
+    username = payload["sub"]
+
+    user = db.get_user(username)
+
+    if not user:
+        raise HTTPException(404, "Không tìm thấy tài khoản.")
+
+    if not pwd_context.verify(data.old_password, user["password_hash"]):
+        raise HTTPException(
+            status_code=400,
+            detail="Mật khẩu cũ không đúng."
+        )
+
+    db.change_password(
+        username,
+        pwd_context.hash(data.new_password)
+    )
+
+    return {
+        "message":"Đổi mật khẩu thành công."
+    }
 
 @app.post("/api/login")
 def login(data: LoginModel):
@@ -145,39 +178,36 @@ def get_my_orders(authorization: str = Header(None)):
 # ==========================
 
 @app.post("/api/update-order-status")
-def update_order_status(
-    data: UpdateStatusModel,
-    authorization: str = Header(None)
-):
+def update_order_status(data:UpdateStatusModel,
+                        authorization:str=Header(None)):
 
-    payload = verify_token(authorization)
+    payload=verify_token(authorization)
 
-    current_user = payload["sub"]
+    current_user=payload["sub"]
 
-    order = db.get_order(data.order_id)
+    order=db.get_contract(data.contract_code)
 
     if not order:
         raise HTTPException(
             status_code=404,
-            detail="Không tìm thấy phiếu lệnh này!"
+            detail="Không tìm thấy phiếu"
         )
 
-    if order["operator"] != current_user:
+    if order["operator"]!=current_user:
         raise HTTPException(
             status_code=403,
-            detail=f"Bị từ chối: Phiếu này được chỉ định cho [{order['operator']}], bạn là [{current_user}] không được bấm nhận!"
+            detail="Bạn không được nhận phiếu này"
         )
 
     db.update_order_status(
-        data.order_id,
+        data.contract_code,
         data.status
     )
 
     return {
-        "status": "success",
-        "message": "Đã cập nhật trạng thái lệnh sản xuất thành công!"
+        "status":"success",
+        "message":"Đã nhận phiếu thành công"
     }
-
 
 # ==========================
 # USERS

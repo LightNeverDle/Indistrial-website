@@ -69,86 +69,25 @@ class Database:
         """)
 
         cursor.execute("SELECT COUNT(*) FROM loose_tube_orders")
-
         if cursor.fetchone()[0] == 0:
-
+            # Tạo dữ liệu với 2 Hợp đồng lớn, mỗi hợp đồng có 3 sản phẩm (dòng)
             orders = [
-                (
-                    "Công ty Cáp Quang Việt Nam",
-                    "HD-2026-001",
-                    "2026-06-25",
-                    "Trần Văn A",
-                    "Quản đốc Nguyễn Văn A",
-                    "OL-D2.5-08",
-                    "2026-06-25",
-                    "08:00",
-                    "12:00",
-                    "worker1",
-                    "Xanh dương",
-                    8,
-                    2.5,
-                    2000.0,
-                    "Yêu cầu kiểm tra kỹ độ căng sợi",
-                    "Chưa xử lý"
-                ),
-                (
-                    "Tập đoàn Viễn thông Á Châu",
-                    "HD-2026-002",
-                    "2026-06-25",
-                    "Trần Văn A",
-                    "Quản đốc Nguyễn Văn A",
-                    "OL-D3.0-24",
-                    "2026-06-25",
-                    "13:30",
-                    "17:30",
-                    "worker1",
-                    "Màu vàng",
-                    24,
-                    3.0,
-                    1500.0,
-                    "Đóng gói bằng rulo gỗ bọc màng PE",
-                    "Chưa xử lý"
-                ),
-                (
-                    "Bưu điện Thành phố",
-                    "HD-2026-003",
-                    "2026-06-25",
-                    "Trần Văn A",
-                    "Trưởng ca Lê Văn B",
-                    "OL-D2.0-04",
-                    "2026-06-26",
-                    "07:30",
-                    "11:30",
-                    "worker1",
-                    "Màu đỏ",
-                    4,
-                    2.0,
-                    3500.0,
-                    "Giao hàng trước 4h chiều",
-                    "Chưa xử lý"
-                )
+                # --- Hợp đồng 1: HD-2026-001 (3 sản phẩm) ---
+                ("Công ty Cáp Quang Việt Nam", "HD-2026-001", "2026-06-25", "Trần A", "Nguyễn A", "OL-D2.5-08", "2026-06-25", "08:00", "12:00", "worker1", "Xanh dương", 8, 2.5, 2000.0, "Ghi chú 1", "Chưa xử lý"),
+                ("Công ty Cáp Quang Việt Nam", "HD-2026-001", "2026-06-25", "Trần A", "Nguyễn A", "OL-D2.5-12", "2026-06-25", "13:00", "17:00", "worker1", "Cam", 12, 2.5, 2000.0, "Ghi chú 2", "Chưa xử lý"),
+                ("Công ty Cáp Quang Việt Nam", "HD-2026-001", "2026-06-25", "Trần A", "Nguyễn A", "OL-D2.5-24", "2026-06-26", "08:00", "12:00", "worker1", "Xanh lá", 24, 2.5, 2000.0, "Ghi chú 3", "Chưa xử lý"),
+                
+                # --- Hợp đồng 2: HD-2026-002 (2 sản phẩm) ---
+                ("Tập đoàn Viễn thông Á Châu", "HD-2026-002", "2026-06-25", "Trần A", "Quản đốc B", "OL-D3.0-24", "2026-06-27", "09:00", "15:00", "worker2", "Màu vàng", 24, 3.0, 1500.0, "Cần đóng gói kỹ", "Chưa xử lý"),
+                ("Tập đoàn Viễn thông Á Châu", "HD-2026-002", "2026-06-25", "Trần A", "Quản đốc B", "OL-D3.0-48", "2026-06-27", "15:30", "18:00", "worker2", "Màu tím", 48, 3.0, 1500.0, "Hàng gấp", "Chưa xử lý")
             ]
 
             cursor.executemany("""
                 INSERT INTO loose_tube_orders(
-                    customer_name,
-                    contract_code,
-                    import_date,
-                    requester,
-                    approver,
-                    loose_tube_code,
-                    operation_date,
-                    start_time,
-                    end_time,
-                    operator,
-                    tube_color,
-                    fiber_count,
-                    diameter,
-                    length,
-                    notes,
-                    status
-                )
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    customer_name, contract_code, import_date, requester, approver, 
+                    loose_tube_code, operation_date, start_time, end_time, operator, 
+                    tube_color, fiber_count, diameter, length, notes, status
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """, orders)
 
         conn.commit()
@@ -157,13 +96,20 @@ class Database:
     # ================= USERS =================
 
     def get_user(self, username):
+
         conn = self.get_connection()
+
         cursor = conn.cursor()
 
-        cursor.execute(
-            "SELECT password_hash,role FROM users WHERE username=?",
-            (username,)
-        )
+        cursor.execute("""
+
+            SELECT *
+
+            FROM users
+
+            WHERE username=?
+
+        """,(username,))
 
         user = cursor.fetchone()
 
@@ -197,23 +143,63 @@ class Database:
         cursor = conn.cursor()
 
         if role == "admin":
-            cursor.execute("SELECT * FROM loose_tube_orders")
+            cursor.execute("""
+                SELECT *
+                FROM loose_tube_orders
+                ORDER BY
+                    CASE status
+                        WHEN 'Chưa xử lý' THEN 1
+                        WHEN 'Đang xử lý' THEN 2
+                        WHEN 'Hoàn thành' THEN 3
+                        ELSE 4
+                    END,
+                    contract_code,
+                    id
+            """)
 
         elif username == "worker1":
             cursor.execute("""
                 SELECT *
                 FROM loose_tube_orders
-                WHERE status='Chưa xử lý'
-            """)
+                WHERE operator=?
+                AND status='Chưa xử lý'
+                ORDER BY contract_code,id
+            """,(username,))
 
         else:
-            cursor.execute("SELECT * FROM loose_tube_orders WHERE 1=0")
+            conn.close()
+            return []
 
-        orders = [dict(row) for row in cursor.fetchall()]
-
+        rows=[dict(r) for r in cursor.fetchall()]
         conn.close()
 
-        return orders
+        result=[]
+        groups={}
+
+        for row in rows:
+
+            code=row["contract_code"]
+
+            if code not in groups:
+
+                groups[code]={
+                    "contract_code":row["contract_code"],
+                    "customer_name":row["customer_name"],
+                    "requester":row["requester"],
+                    "approver":row["approver"],
+                    "operator":row["operator"],
+                    "import_date":row["import_date"],
+                    "status":row["status"],
+                    "product_count":0,
+                    "details":[]
+                }
+
+                result.append(groups[code])
+
+            groups[code]["details"].append(row)
+            groups[code]["product_count"]+=1
+
+        return result
 
     def get_order(self, order_id):
 
@@ -232,19 +218,56 @@ class Database:
 
         return order
 
-    def update_order_status(self, order_id, status):
+    def update_order_status(self, contract_code, status):
 
-        conn = self.get_connection()
-        cursor = conn.cursor()
+        conn=self.get_connection()
+        cursor=conn.cursor()
 
         cursor.execute("""
             UPDATE loose_tube_orders
             SET status=?
-            WHERE id=?
-        """, (status, order_id))
+            WHERE contract_code=?
+        """,(status,contract_code))
 
         conn.commit()
         conn.close()
 
+    def get_contract(self, contract_code):
+
+        conn=self.get_connection()
+        cursor=conn.cursor()
+
+        cursor.execute("""
+            SELECT operator
+            FROM loose_tube_orders
+            WHERE contract_code=?
+            LIMIT 1
+        """,(contract_code,))
+
+        row=cursor.fetchone()
+
+        conn.close()
+
+        return row
+    
+    def change_password(self, username, password_hash):
+
+        conn = self.get_connection()
+
+        cursor = conn.cursor()
+
+        cursor.execute("""
+
+            UPDATE users
+
+            SET password_hash=?
+
+            WHERE username=?
+
+        """,(password_hash, username))
+
+        conn.commit()
+
+        conn.close()
 
 db = Database()
