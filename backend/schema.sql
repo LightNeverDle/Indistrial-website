@@ -217,6 +217,23 @@ CREATE TABLE IF NOT EXISTS qc_reports (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =====================================================================
+-- INVENTORY / WAREHOUSE: lưu sản phẩm khi QC duyệt đạt
+-- =====================================================================
+CREATE TABLE IF NOT EXISTS inventory (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  roll_id INT NOT NULL,
+  product_code VARCHAR(100) DEFAULT NULL,
+  product_type VARCHAR(100) DEFAULT NULL,
+  length FLOAT DEFAULT NULL,
+  quantity INT DEFAULT 1,
+  stored_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+  location VARCHAR(100) DEFAULT NULL,
+  status VARCHAR(50) DEFAULT 'in_stock',
+  notes TEXT DEFAULT NULL,
+  CONSTRAINT fk_inventory_roll FOREIGN KEY (roll_id) REFERENCES cable_rolls(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =====================================================================
 -- NHẬT KÝ THAO TÁC (AUDIT LOG) — ghi lại hành động của MỌI role
 -- (đăng nhập, đổi mật khẩu, nhận việc/cập nhật trạng thái, tạo/xóa tài khoản...)
 -- Lưu trực tiếp username + role tại thời điểm thao tác (denormalized) để

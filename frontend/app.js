@@ -175,6 +175,9 @@ async function renderRolls(tab) {
                 ? `<p><b>Kết quả QC:</b> <span class="status-badge" style="background:var(--error)">${roll.qc.quality_rating || "Không đạt"}</span></p>`
                 : "";
 
+            const checklistLine = roll.checklist_status || (roll.in_inventory ? "Hoàn thành/Chờ giao" : null);
+            const inventoryBadge = roll.in_inventory ? `<span class="status-badge" style="background:#22c55e">Nhập kho</span>` : "";
+
             card.innerHTML = `
                 <h3 style="color:var(--primary-neon)">🧵 ${roll.roll_code}</h3>
                 <p class="product-type-tag">${productLabel(roll.product_type)} ${stageBadge(roll.current_stage)}</p>
@@ -184,6 +187,7 @@ async function renderRolls(tab) {
                 <p><b>Người vận hành:</b> ${roll.operator || "Chưa gán"}</p>
                 <p><b>Chiều dài:</b> ${roll.length != null ? roll.length + " m" : "—"}</p>
                 ${qcLine}
+                ${checklistLine ? `<p><b>Checklist:</b> ${checklistLine} ${inventoryBadge}</p>` : ""}
                 <div style="margin-top:15px">
                     <button class="btn btn-secondary" onclick="showRollDetail(${roll.id})">Chi tiết</button>
                     ${renderStatusButton(roll)}
@@ -325,6 +329,25 @@ function buildRollDetailHtml(data) {
 
     if (currentRole === "admin" || currentRole === "inspector") {
         html += buildQcFormHtml(roll, qc);
+    }
+
+    // --- Thông tin tồn kho / checklist ---
+    if (data.inventory) {
+        const inv = data.inventory;
+        html += `
+        <div class="note-box" style="border-left-color:#22c55e; margin-top:15px;">
+            <h3 style="color:#22c55e">🏷️ Thông tin kho</h3>
+            <p><b>Mã sản phẩm:</b> ${inv.product_code || "—"} &nbsp;|&nbsp; <b>Loại:</b> ${inv.product_type || "—"}</p>
+            <p><b>Chiều dài:</b> ${inv.length != null ? inv.length + (inv.length > 10 ? " m" : "") : "—"} &nbsp;|&nbsp; <b>Số lượng:</b> ${inv.quantity || 1}</p>
+            <p><b>Ngày nhập:</b> ${inv.stored_date || "—"} &nbsp;|&nbsp; <b>Vị trí:</b> ${inv.location || "—"}</p>
+            <p>${inv.notes || ""}</p>
+        </div>`;
+    } else if (data.roll && data.roll.checklist_status) {
+        html += `
+        <div class="note-box" style="border-left-color:#f59e0b; margin-top:15px;">
+            <h3 style="color:#f59e0b">📦 Checklist</h3>
+            <p><b>Trạng thái checklist:</b> ${data.roll.checklist_status}</p>
+        </div>`;
     }
 
     // --- Lịch sử cập nhật (production_logs) ---

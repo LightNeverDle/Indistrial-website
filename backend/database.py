@@ -102,6 +102,15 @@ class Database:
                 if not cursor.fetchone():
                     cursor.execute("ALTER TABLE qc_reports ADD COLUMN shift VARCHAR(50) DEFAULT NULL")
 
+                # Add inventory / checklist columns to cable_rolls if missing
+                cursor.execute("SHOW COLUMNS FROM cable_rolls LIKE 'in_inventory'")
+                if not cursor.fetchone():
+                    cursor.execute("ALTER TABLE cable_rolls ADD COLUMN in_inventory TINYINT(1) DEFAULT 0")
+
+                cursor.execute("SHOW COLUMNS FROM cable_rolls LIKE 'checklist_status'")
+                if not cursor.fetchone():
+                    cursor.execute("ALTER TABLE cable_rolls ADD COLUMN checklist_status VARCHAR(100) DEFAULT NULL")
+
                 cursor.execute("SELECT COUNT(*) AS c FROM users")
                 if cursor.fetchone()["c"] == 0:
                     self._seed_data(conn)
@@ -511,6 +520,7 @@ class Database:
                     SELECT
                         cr.id, cr.roll_code, cr.product_type, cr.length,
                         cr.current_stage, cr.status, cr.created_at,
+                        cr.in_inventory, cr.checklist_status,
                         c.id AS contract_id, c.contract_code, c.customer_name,
                         c.requester, c.approver, c.created_date,
                         (SELECT u.username FROM production_logs pl
@@ -567,7 +577,18 @@ class Database:
                             "checked_date": str(qc["checked_date"]) if qc and qc["checked_date"] else None,
                         } if qc else None
 
+                        # Thêm thông tin checklist/inventory nếu có
+                        item["in_inventory"] = bool(r.get("in_inventory")) if r.get("in_inventory") is not None else False
+                        item["checklist_status"] = r.get("checklist_status")
+
                     result.append(item)
+
+                # Với các tab khác cũng trả checklist/inventory để frontend hiển thị
+                for r_item in result:
+                    if "in_inventory" not in r_item:
+                        r_item["in_inventory"] = bool(r_item.get("in_inventory")) if r_item.get("in_inventory") is not None else False
+                    if "checklist_status" not in r_item:
+                        r_item["checklist_status"] = r_item.get("checklist_status")
 
                 return result
         finally:
@@ -622,6 +643,13 @@ class Database:
                 )
                 qc_report = cursor.fetchone()
 
+                # Inventory / warehouse record (nếu đã nhập kho)
+                cursor.execute(
+                    "SELECT * FROM inventory WHERE roll_id=%s ORDER BY id DESC LIMIT 1",
+                    (roll_id,),
+                )
+                inventory = cursor.fetchone()
+
                 # Lịch sử cập nhật
                 cursor.execute(
                     """
@@ -643,6 +671,7 @@ class Database:
 
                 return {
                     "roll": stringify_dates(dict(roll)),
+                    "inventory": stringify_dates(dict(inventory)) if inventory else None,
                     "contract": stringify_dates(dict(contract)) if contract else None,
                     "material_preparation": stringify_dates(dict(prep)) if prep else None,
                     "plan": stringify_dates(dict(plan)) if plan else None,
@@ -757,6 +786,24 @@ class Database:
                     """,
                     (roll_id, roll["current_stage"] or "QC", new_status, checked_by, datetime.now(), f"QC: {quality_rating}"),
                 )
+
+                # Nếu QC 'Đạt' -> nhập kho tự động + cập nhật checklist
+                if quality_rating == "Đạt":
+                    product_code = data.get("product_code") or None
+                    product_type = data.get("product_type") or roll.get("product_type")
+                    prod_length = data.get("production_length") or roll.get("length")
+
+                    cursor.execute(
+                        "INSERT INTO inventory (roll_id, product_code, product_type, length, quantity, location, status, notes)"
+                        " VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                        (roll_id, product_code, product_type, prod_length, 1, "Kho chính", "in_stock",
+                         "Tự động nhập kho khi QC duyệt đạt"),
+                    )
+
+                    cursor.execute(
+                        "UPDATE cable_rolls SET in_inventory=1, checklist_status=%s WHERE id=%s",
+                        ("Hoàn thành/Chờ giao", roll_id),
+                    )
             conn.commit()
             return True
         finally:
