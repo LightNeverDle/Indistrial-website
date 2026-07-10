@@ -205,6 +205,7 @@ CREATE TABLE IF NOT EXISTS qc_reports (
   product_type VARCHAR(100) DEFAULT NULL,
   production_length FLOAT DEFAULT NULL,
   manufacture_date DATE DEFAULT NULL,
+  shift VARCHAR(50) DEFAULT NULL,
   quality_rating VARCHAR(50) DEFAULT NULL,
   short_fiber INT DEFAULT NULL,
   broken_fiber INT DEFAULT NULL,

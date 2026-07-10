@@ -1,6 +1,7 @@
 import os
 import sys
 from datetime import datetime, timedelta
+from typing import Optional
 
 import jwt
 from fastapi import FastAPI, HTTPException
@@ -56,6 +57,19 @@ class CreateUserModel(BaseModel):
     username: str
     password: str
     role: str
+
+
+class SubmitQcModel(BaseModel):
+    product_code: str
+    product_type: str
+    production_length: Optional[float] = None
+    manufacture_date: Optional[str] = None
+    shift: Optional[str] = None
+    quality_rating: str
+    short_fiber: Optional[int] = None
+    broken_fiber: Optional[int] = None
+    checked_date: Optional[str] = None
+    notes: Optional[str] = None
 
 
 # ==========================
@@ -192,6 +206,27 @@ def update_roll_status(roll_id: int, data: UpdateRollStatusModel, payload=Depend
     )
 
     return {"status": "success", "message": f"Đã cập nhật trạng thái: {data.status}"}
+
+
+@app.post("/api/rolls/{roll_id}/qc")
+def submit_qc_report(roll_id: int, data: SubmitQcModel, payload=Depends(verify_token)):
+    if payload.get("role") not in {"admin", "inspector"}:
+        raise HTTPException(status_code=403, detail="Bạn không có quyền thực hiện QC.")
+
+    if data.quality_rating not in {"Đạt", "Không đạt"}:
+        raise HTTPException(status_code=400, detail="Đánh giá chất lượng không hợp lệ.")
+
+    payload_data = data.dict() if hasattr(data, "dict") else data.model_dump()
+    ok = db.submit_qc_report(roll_id, payload_data, payload["sub"])
+    if not ok:
+        raise HTTPException(status_code=404, detail="Không tìm thấy lô sản phẩm.")
+
+    db.add_audit_log(
+        payload["sub"], payload.get("role"), "QC_REPORT",
+        target=f"roll#{roll_id}", description=f"Ghi nhận kết quả QC: {data.quality_rating}"
+    )
+
+    return {"status": "success", "message": "Đã lưu kết quả QC thành công."}
 
 
 # ==========================

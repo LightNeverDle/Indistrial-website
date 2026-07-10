@@ -41,6 +41,7 @@
 const API_URL = "http://127.0.0.1:8000/api";
 let authToken = null;
 let currentUsername = null;
+let currentRole = null;
 let currentTab = "pending";
 let rollCache = {}; // cache theo id để mở modal chi tiết không phải gọi lại API list
 
@@ -68,6 +69,16 @@ const PRODUCT_LABELS = {
 
 function productLabel(type) {
     return PRODUCT_LABELS[type] || type || "Không rõ";
+}
+
+function escapeHtml(value) {
+    if (value == null || value === undefined) return "";
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
 }
 
 // =========================================================
@@ -307,9 +318,13 @@ function buildRollDetailHtml(data) {
             <h3 style="color:${isPass ? '#22c55e' : '#ef4444'}">🔍 Kết quả kiểm định (QC)</h3>
             <p><b>Mã sản phẩm:</b> ${qc.product_code || "—"} &nbsp;|&nbsp; <b>Kết quả:</b> ${qc.quality_rating || "—"}</p>
             <p><b>Sợi ngắn:</b> ${qc.short_fiber ?? "—"} &nbsp;|&nbsp; <b>Sợi đứt:</b> ${qc.broken_fiber ?? "—"}</p>
-            <p><b>Ngày kiểm:</b> ${qc.checked_date || "—"}</p>
+            <p><b>Ngày kiểm:</b> ${qc.checked_date || "—"} &nbsp;|&nbsp; <b>Ca sản xuất:</b> ${qc.shift || "—"}</p>
             <p>${qc.notes || ""}</p>
         </div>`;
+    }
+
+    if (currentRole === "admin" || currentRole === "inspector") {
+        html += buildQcFormHtml(roll, qc);
     }
 
     // --- Lịch sử cập nhật (production_logs) ---
@@ -394,6 +409,107 @@ const PLAN_LABELS = {
     ]
 };
 
+function buildQcFormHtml(roll, qc) {
+    const today = new Date().toISOString().slice(0, 10);
+    const currentDate = qc?.checked_date ? qc.checked_date.slice(0, 10) : today;
+
+    return `
+    <div class="table-container" style="margin-top:20px">
+        <h3 style="margin-bottom:10px;">✅ Phiếu QC</h3>
+        <form onsubmit="submitQcReport(event, ${roll.id})">
+            <div class="form-grid">
+                <div class="input-group">
+                    <label>Mã số sản phẩm</label>
+                    <input name="product_code" value="${escapeHtml(qc?.product_code || roll.roll_code || "")}" required>
+                </div>
+                <div class="input-group">
+                    <label>Loại sản phẩm</label>
+                    <input name="product_type" value="${escapeHtml(qc?.product_type || productLabel(roll.product_type))}" required>
+                </div>
+                <div class="input-group">
+                    <label>Chiều dài sản xuất (m)</label>
+                    <input type="number" step="0.01" name="production_length" value="${escapeHtml(qc?.production_length ?? roll.length ?? "")}">
+                </div>
+                <div class="input-group">
+                    <label>Ngày sản xuất</label>
+                    <input type="date" name="manufacture_date" value="${escapeHtml(qc?.manufacture_date || "")}">
+                </div>
+                <div class="input-group">
+                    <label>Ca sản xuất</label>
+                    <input name="shift" value="${escapeHtml(qc?.shift || "")}">
+                </div>
+                <div class="input-group">
+                    <label>Đánh giá chất lượng</label>
+                    <select name="quality_rating">
+                        <option value="Đạt" ${qc?.quality_rating === "Đạt" ? "selected" : ""}>Đạt</option>
+                        <option value="Không đạt" ${qc?.quality_rating === "Không đạt" ? "selected" : ""}>Không đạt</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Sợi ngắn</label>
+                    <input type="number" min="0" name="short_fiber" value="${escapeHtml(qc?.short_fiber ?? "")}">
+                </div>
+                <div class="input-group">
+                    <label>Sợi dài / đứt</label>
+                    <input type="number" min="0" name="broken_fiber" value="${escapeHtml(qc?.broken_fiber ?? "")}">
+                </div>
+                <div class="input-group">
+                    <label>Ngày kiểm tra</label>
+                    <input type="date" name="checked_date" value="${escapeHtml(currentDate)}">
+                </div>
+                <div class="input-group">
+                    <label>Người kiểm tra</label>
+                    <input name="checked_by" value="${escapeHtml(currentUsername || "")}" readonly>
+                </div>
+            </div>
+            <div class="input-group">
+                <label>Ghi chú</label>
+                <textarea name="notes" rows="3">${escapeHtml(qc?.notes || "")}</textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Lưu kết quả QC</button>
+        </form>
+    </div>`;
+}
+
+async function submitQcReport(event, rollId) {
+    event.preventDefault();
+    const form = event.target;
+    const payload = {
+        product_code: form.product_code.value.trim(),
+        product_type: form.product_type.value.trim(),
+        production_length: form.production_length.value ? Number(form.production_length.value) : null,
+        manufacture_date: form.manufacture_date.value || null,
+        shift: form.shift.value.trim() || null,
+        quality_rating: form.quality_rating.value,
+        short_fiber: form.short_fiber.value ? Number(form.short_fiber.value) : null,
+        broken_fiber: form.broken_fiber.value ? Number(form.broken_fiber.value) : null,
+        checked_date: form.checked_date.value || null,
+        notes: form.notes.value.trim() || null,
+    };
+
+    try {
+        const response = await fetch(`${API_URL}/rolls/${rollId}/qc`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${authToken}`
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+        if (response.ok) {
+            alert(result.message || "Đã lưu kết quả QC");
+            showRollDetail(rollId);
+            renderRolls(currentTab);
+        } else {
+            alert(result.detail || "Lưu QC thất bại.");
+        }
+    } catch (err) {
+        alert("Không thể kết nối máy chủ.");
+    }
+}
+
 function buildPlanInfoHtml(productType, plan) {
     const fields = PLAN_LABELS[productType];
     if (!plan || !fields) return "";
@@ -457,6 +573,7 @@ document.getElementById("login-form").addEventListener("submit", async (e) => {
         if (response.ok) {
             authToken = result.token;
             currentUsername = result.username;
+            currentRole = result.role;
 
             document.getElementById("user-display").textContent = result.username.toUpperCase();
             document.getElementById("role-display").textContent = result.role.toUpperCase();

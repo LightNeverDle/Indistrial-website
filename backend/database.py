@@ -98,6 +98,10 @@ class Database:
             conn.commit()
 
             with conn.cursor() as cursor:
+                cursor.execute("SHOW COLUMNS FROM qc_reports LIKE 'shift'")
+                if not cursor.fetchone():
+                    cursor.execute("ALTER TABLE qc_reports ADD COLUMN shift VARCHAR(50) DEFAULT NULL")
+
                 cursor.execute("SELECT COUNT(*) AS c FROM users")
                 if cursor.fetchone()["c"] == 0:
                     self._seed_data(conn)
@@ -684,6 +688,74 @@ class Database:
                     VALUES (%s, %s, %s, %s, %s, %s)
                     """,
                     (roll_id, roll["current_stage"], new_status, user_id, datetime.now(), None),
+                )
+            conn.commit()
+            return True
+        finally:
+            conn.close()
+
+    def submit_qc_report(self, roll_id, data, username):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT id, status, current_stage FROM cable_rolls WHERE id=%s", (roll_id,))
+                roll = cursor.fetchone()
+                if not roll:
+                    return False
+
+                cursor.execute("SELECT id FROM users WHERE username=%s", (username,))
+                user = cursor.fetchone()
+                checked_by = user["id"] if user else None
+
+                manufacture_date = data.get("manufacture_date") or None
+                if manufacture_date:
+                    manufacture_date = datetime.fromisoformat(manufacture_date).date()
+
+                checked_date = data.get("checked_date") or None
+                if checked_date:
+                    checked_date = datetime.fromisoformat(checked_date)
+                else:
+                    checked_date = datetime.now()
+
+                quality_rating = data.get("quality_rating")
+                new_status = "completed" if quality_rating == "Đạt" else "rejected"
+                new_stage = "Hoàn thành" if quality_rating == "Đạt" else "Yêu cầu làm lại"
+
+                cursor.execute(
+                    """
+                    INSERT INTO qc_reports (
+                        roll_id, product_code, product_type, production_length,
+                        manufacture_date, quality_rating, short_fiber, broken_fiber,
+                        checked_date, checked_by, shift, notes
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        roll_id,
+                        data.get("product_code"),
+                        data.get("product_type"),
+                        data.get("production_length"),
+                        manufacture_date,
+                        quality_rating,
+                        data.get("short_fiber"),
+                        data.get("broken_fiber"),
+                        checked_date,
+                        checked_by,
+                        data.get("shift"),
+                        data.get("notes"),
+                    ),
+                )
+
+                cursor.execute(
+                    "UPDATE cable_rolls SET status=%s, current_stage=%s WHERE id=%s",
+                    (new_status, new_stage, roll_id),
+                )
+
+                cursor.execute(
+                    """
+                    INSERT INTO production_logs (roll_id, stage, status, updated_by, updated_at, notes)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    """,
+                    (roll_id, roll["current_stage"] or "QC", new_status, checked_by, datetime.now(), f"QC: {quality_rating}"),
                 )
             conn.commit()
             return True
