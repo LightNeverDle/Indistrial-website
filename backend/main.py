@@ -3,10 +3,15 @@ import sys
 from datetime import datetime, timedelta
 
 import jwt
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+
+
+from fastapi import Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
 
 # ==========================
 # Chuyển thư mục làm việc về Project/
@@ -57,11 +62,12 @@ class CreateUserModel(BaseModel):
 # JWT
 # ==========================
 
-def verify_token(authorization: str):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Vui lòng đăng nhập lại!")
+security = HTTPBearer()
 
-    token = authorization.split(" ")[1]
+def verify_token(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    token = credentials.credentials
 
     try:
         return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -71,10 +77,15 @@ def verify_token(authorization: str):
         raise HTTPException(status_code=401, detail="Token không hợp lệ!")
 
 
-def verify_admin_token(authorization: str):
-    payload = verify_token(authorization)
+def verify_admin_token(
+    payload=Depends(verify_token)
+):
     if payload.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Bị từ chối: Bạn không có quyền quản trị!")
+        raise HTTPException(
+            status_code=403,
+            detail="Bị từ chối: Bạn không có quyền quản trị!"
+        )
+
     return payload
 
 
@@ -107,8 +118,10 @@ def login(data: LoginModel):
 
 
 @app.post("/api/change-password")
-def change_password(data: ChangePasswordModel, authorization: str = Header(None)):
-    payload = verify_token(authorization)
+def change_password(
+    data: ChangePasswordModel,
+    payload=Depends(verify_token)
+):
     username = payload["sub"]
     user = db.get_user(username)
 
@@ -119,7 +132,12 @@ def change_password(data: ChangePasswordModel, authorization: str = Header(None)
         raise HTTPException(status_code=400, detail="Mật khẩu cũ không đúng.")
 
     db.change_password(username, pwd_context.hash(data.new_password))
-    db.add_audit_log(username, payload.get("role"), "CHANGE_PASSWORD", description="Tự đổi mật khẩu")
+    db.add_audit_log(
+        username,
+        payload.get("role"),
+        "CHANGE_PASSWORD",
+        description="Tự đổi mật khẩu"
+    )
 
     return {"message": "Đổi mật khẩu thành công."}
 
@@ -129,9 +147,7 @@ def change_password(data: ChangePasswordModel, authorization: str = Header(None)
 # ==========================
 
 @app.get("/api/rolls")
-def get_rolls(tab: str = "pending", authorization: str = Header(None)):
-    payload = verify_token(authorization)
-
+def get_rolls(tab: str = "pending",payload=Depends(verify_token)):
     if tab not in VALID_STATUSES:
         raise HTTPException(status_code=400, detail="Tab không hợp lệ.")
 
@@ -143,9 +159,7 @@ def get_rolls(tab: str = "pending", authorization: str = Header(None)):
 # ==========================
 
 @app.get("/api/rolls/{roll_id}/detail")
-def get_roll_detail(roll_id: int, authorization: str = Header(None)):
-    verify_token(authorization)
-
+def get_roll_detail(roll_id: int, payload=Depends(verify_token)):
     detail = db.get_roll_detail(roll_id)
     if not detail:
         raise HTTPException(status_code=404, detail="Không tìm thấy lô sản phẩm.")
@@ -158,8 +172,7 @@ def get_roll_detail(roll_id: int, authorization: str = Header(None)):
 # ==========================
 
 @app.post("/api/rolls/{roll_id}/status")
-def update_roll_status(roll_id: int, data: UpdateRollStatusModel, authorization: str = Header(None)):
-    payload = verify_token(authorization)
+def update_roll_status(roll_id: int, data: UpdateRollStatusModel, payload=Depends(verify_token)):
     username = payload["sub"]
 
     if data.status not in VALID_STATUSES:
@@ -186,15 +199,14 @@ def update_roll_status(roll_id: int, data: UpdateRollStatusModel, authorization:
 # ==========================
 
 @app.get("/api/users")
-def get_all_users(authorization: str = Header(None)):
-    verify_admin_token(authorization)
+def get_all_users(
+    payload = Depends(verify_admin_token)
+):
     return db.get_users()
 
 
 @app.post("/api/users")
-def create_user(data: CreateUserModel, authorization: str = Header(None)):
-    payload = verify_admin_token(authorization)
-
+def create_user(data: CreateUserModel, payload=Depends(verify_admin_token)):
     if db.get_user(data.username):
         raise HTTPException(status_code=400, detail="Tài khoản đã tồn tại.")
 
@@ -207,9 +219,7 @@ def create_user(data: CreateUserModel, authorization: str = Header(None)):
 
 
 @app.delete("/api/users/{username}")
-def delete_user(username: str, authorization: str = Header(None)):
-    payload = verify_admin_token(authorization)
-
+def delete_user(username: str, payload=Depends(verify_admin_token)):
     if username == "admin":
         raise HTTPException(status_code=403, detail="Không thể xóa tài khoản admin.")
 
@@ -223,8 +233,7 @@ def delete_user(username: str, authorization: str = Header(None)):
 # ==========================
 
 @app.get("/api/audit-logs")
-def get_audit_logs(role: str = "all", authorization: str = Header(None)):
-    verify_admin_token(authorization)
+def get_audit_logs(role: str = "all", payload=Depends(verify_admin_token)):
     return db.get_audit_logs(role=role)
 
 
