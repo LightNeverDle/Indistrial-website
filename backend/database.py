@@ -509,41 +509,70 @@ class Database:
 
     def get_rolls(self, tab, role, username):
         """
-        Trả về danh sách cable_rolls cho 1 tab, join contracts + operator gần nhất
-        (lấy từ production_logs.updated_by mới nhất) + qc_reports (cho tab rejected).
+        Trả về danh sách cable_rolls phân quyền theo role:
+        - worker1: loose_tube
+        - worker2: sz
+        - worker3: jacket
+        - inspector: chỉ các tab liên quan QC (pending-inspect, rejected, completed)
+        - admin: toàn quyền
         """
+        # Map vai trò công nhân với chủng loại sản phẩm phụ trách
+        WORKER_PRODUCT_MAP = {
+            "worker1": "loose_tube",
+            "worker2": "sz",
+            "worker3": "jacket",
+        }
+
+        # Inspector chỉ được xem các tab liên quan tới kiểm định/kết quả
+        if role == "inspector" and tab not in ("pending-inspect", "rejected", "completed"):
+            return []
+
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
-                cursor.execute(
-                    """
+                # 1. Khởi tạo câu lệnh SQL gốc
+                query = """
                     SELECT
                         cr.id, cr.roll_code, cr.product_type, cr.length,
                         cr.current_stage, cr.status, cr.created_at,
                         cr.in_inventory, cr.checklist_status,
                         c.id AS contract_id, c.contract_code, c.customer_name,
                         c.requester, c.approver, c.created_date,
-                        (SELECT u.username FROM production_logs pl
-                            JOIN users u ON u.id = pl.updated_by
-                            WHERE pl.roll_id = cr.id
-                            ORDER BY pl.updated_at DESC LIMIT 1) AS operator
+                        op.username AS operator
                     FROM cable_rolls cr
                     JOIN contracts c ON c.id = cr.contract_id
+                    LEFT JOIN (
+                        SELECT pl1.roll_id, u.username
+                        FROM production_logs pl1
+                        JOIN users u ON u.id = pl1.updated_by
+                        INNER JOIN (
+                            SELECT roll_id, MAX(updated_at) as max_time
+                            FROM production_logs
+                            GROUP BY roll_id
+                        ) pl2 ON pl1.roll_id = pl2.roll_id AND pl1.updated_at = pl2.max_time
+                    ) op ON op.roll_id = cr.id
                     WHERE cr.status = %s
-                    ORDER BY cr.created_at DESC
-                    """,
-                    (tab,),
-                )
+                """
+                params = [tab]
+
+                # 2. Xử lý điều kiện lọc theo Role người dùng (Worker)
+                if role in WORKER_PRODUCT_MAP:
+                    allowed_product = WORKER_PRODUCT_MAP[role]
+                    
+                    if tab == "pending":
+                        # Việc đang chờ: Thấy tất cả phiếu CHƯA AI NHẬN thuộc đúng loại sản phẩm của mình
+                        query += " AND cr.product_type = %s"
+                        params.append(allowed_product)
+                    else:
+                        # Các tab khác: Chỉ thấy phiếu đúng loại sản phẩm VÀ do chính mình thực hiện
+                        query += " AND cr.product_type = %s AND op.username = %s"
+                        params.extend([allowed_product, username])
+
+                query += " ORDER BY cr.created_at DESC"
+                cursor.execute(query, params)
                 rows = cursor.fetchall()
 
-                # Người không phải admin/inspector: chỉ thấy phiếu đang chờ (chưa ai nhận)
-                # hoặc phiếu chính họ đang xử lý.
-                if role not in ("admin", "inspector"):
-                    if tab == "pending":
-                        pass  # ai cũng thấy việc đang chờ để nhận
-                    else:
-                        rows = [r for r in rows if r["operator"] == username]
-
+                # 3. Format dữ liệu trả về cho Frontend
                 result = []
                 for r in rows:
                     item = {
@@ -555,6 +584,8 @@ class Database:
                         "status": r["status"],
                         "created_at": str(r["created_at"]) if r["created_at"] else None,
                         "operator": r["operator"],
+                        "in_inventory": bool(r.get("in_inventory")),
+                        "checklist_status": r.get("checklist_status"),
                         "contract": {
                             "id": r["contract_id"],
                             "contract_code": r["contract_code"],
@@ -565,6 +596,7 @@ class Database:
                         },
                     }
 
+                    # Truy vấn bổ sung thông tin QC nếu ở tab 'rejected'
                     if tab == "rejected":
                         cursor.execute(
                             "SELECT quality_rating, checked_date FROM qc_reports "
@@ -577,18 +609,7 @@ class Database:
                             "checked_date": str(qc["checked_date"]) if qc and qc["checked_date"] else None,
                         } if qc else None
 
-                        # Thêm thông tin checklist/inventory nếu có
-                        item["in_inventory"] = bool(r.get("in_inventory")) if r.get("in_inventory") is not None else False
-                        item["checklist_status"] = r.get("checklist_status")
-
                     result.append(item)
-
-                # Với các tab khác cũng trả checklist/inventory để frontend hiển thị
-                for r_item in result:
-                    if "in_inventory" not in r_item:
-                        r_item["in_inventory"] = bool(r_item.get("in_inventory")) if r_item.get("in_inventory") is not None else False
-                    if "checklist_status" not in r_item:
-                        r_item["checklist_status"] = r_item.get("checklist_status")
 
                 return result
         finally:

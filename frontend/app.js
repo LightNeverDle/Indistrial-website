@@ -463,7 +463,8 @@ function buildQcFormHtml(roll, qc) {
                 </div>
                 <div class="input-group">
                     <label>Đánh giá chất lượng</label>
-                    <select name="quality_rating">
+                    <!-- Đã thêm class modern-select ở đây -->
+                    <select name="quality_rating" class="modern-select">
                         <option value="Đạt" ${qc?.quality_rating === "Đạt" ? "selected" : ""}>Đạt</option>
                         <option value="Không đạt" ${qc?.quality_rating === "Không đạt" ? "selected" : ""}>Không đạt</option>
                     </select>

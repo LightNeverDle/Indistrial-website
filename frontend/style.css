@@ -154,6 +154,37 @@ body {
     color: var(--text-muted);
 }
 
+/* Áp dụng style cho tất cả ô textarea trong form */
+.input-group textarea,
+textarea {
+    width: 100%;
+    padding: 14px 16px;
+    background: var(--input-bg);
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    color: var(--text-main);
+    font-size: 1rem;
+    font-family: inherit;
+    transition: all 0.3s ease;
+    box-shadow: var(--shadow-sm);
+    resize: vertical;
+    min-height: 90px;
+}
+
+/* Hiệu ứng khi focus vào ô ghi chú */
+.input-group textarea:focus,
+textarea:focus {
+    outline: none;
+    border-color: var(--primary-blue);
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15);
+    transform: translateY(-1px);
+}
+
+.input-group textarea::placeholder,
+textarea::placeholder {
+    color: var(--text-muted);
+}
+
 /* =========================================
    2. DASHBOARD LIGHT MODE
    ========================================= */
@@ -618,14 +649,39 @@ body {
     background-position: right 12px center;
 }
 
-.modern-select:focus {
-    border-color: var(--primary-blue);
-    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+.modern-select {
+    width: 100%;
+    padding: 14px 40px 14px 16px; /* Tăng padding phải để tránh chữ đè lên mũi tên */
+    background-color: var(--input-bg);
+    border: 2px solid var(--border-color);
+    border-radius: 12px; /* Đồng bộ radius 12px với input */
+    color: var(--text-main);
+    font-size: 1rem;
+    outline: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: var(--shadow-sm); /* Thêm shadow mặc định */
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    
+    /* Icon mũi tên */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23667eea' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 16px center;
 }
 
+.modern-select:focus {
+    border-color: var(--primary-blue);
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15); /* Đồng bộ độ nhạt opacity 0.15 */
+    transform: translateY(-1px); /* Hiệu ứng nổi nhẹ giống input */
+}
+
+/* Style cho danh sách option sổ xuống */
 .modern-select option {
-    background: white;
+    background-color: var(--input-bg); /* Dùng variable thay vì màu white cứng */
     color: var(--text-main);
+    padding: 10px;
 }
 
 /* User Table Light Mode */
