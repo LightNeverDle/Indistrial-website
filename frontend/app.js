@@ -262,6 +262,85 @@ async function showRollDetail(rollId) {
     }
 }
 
+function buildQcFormHtml(roll, qc) {
+    const today = new Date().toISOString().slice(0, 10);
+    const currentDate = qc?.checked_date ? qc.checked_date.slice(0, 10) : today;
+
+    return `
+    <div class="table-container" style="margin-top:20px">
+        <h3 style="margin-bottom:10px;">✅ Phiếu QC</h3>
+        <form onsubmit="submitQcReport(event, ${roll.id})">
+            <div class="form-grid">
+                <div class="input-group">
+                    <label>Mã số sản phẩm</label>
+                    <input name="product_code" value="${escapeHtml(qc?.product_code || roll.roll_code || "")}" required>
+                </div>
+                <div class="input-group">
+                    <label>Loại sản phẩm</label>
+                    <input name="product_type" value="${escapeHtml(qc?.product_type || productLabel(roll.product_type))}" required>
+                </div>
+                <div class="input-group">
+                    <label>Chiều dài sản xuất (m)</label>
+                    <input type="number" step="0.01" name="production_length" value="${escapeHtml(qc?.production_length ?? roll.length ?? "")}">
+                </div>
+                <div class="input-group">
+                    <label>Ngày sản xuất</label>
+                    <input type="date" name="manufacture_date" value="${escapeHtml(qc?.manufacture_date || "")}">
+                </div>
+                <div class="input-group">
+                    <label>Ca sản xuất</label>
+                    <input name="shift" value="${escapeHtml(qc?.shift || "")}">
+                </div>
+                <div class="input-group">
+                    <label>Đánh giá chất lượng</label>
+                    <select name="quality_rating" class="modern-select">
+                        <option value="Đạt" ${qc?.quality_rating === "Đạt" ? "selected" : ""}>Đạt</option>
+                        <option value="Không đạt" ${qc?.quality_rating === "Không đạt" ? "selected" : ""}>Không đạt</option>
+                    </select>
+                </div>
+
+                <!-- Ô nhập Sợi ngắn với nút +/- tùy chỉnh -->
+                <div class="input-group">
+                    <label>Sợi ngắn</label>
+                    <div class="number-input-wrapper">
+                        <input type="number" min="0" name="short_fiber" value="${escapeHtml(qc?.short_fiber ?? "")}">
+                        <div class="spin-buttons">
+                            <button type="button" class="spin-btn" onclick="this.parentElement.previousElementSibling.stepDown()">-</button>
+                            <button type="button" class="spin-btn" onclick="this.parentElement.previousElementSibling.stepUp()">+</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ô nhập Sợi dài/đứt với nút +/- tùy chỉnh -->
+                <div class="input-group">
+                    <label>Sợi dài / đứt</label>
+                    <div class="number-input-wrapper">
+                        <input type="number" min="0" name="broken_fiber" value="${escapeHtml(qc?.broken_fiber ?? "")}">
+                        <div class="spin-buttons">
+                            <button type="button" class="spin-btn" onclick="this.parentElement.previousElementSibling.stepDown()">-</button>
+                            <button type="button" class="spin-btn" onclick="this.parentElement.previousElementSibling.stepUp()">+</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label>Ngày kiểm tra</label>
+                    <input type="date" name="checked_date" value="${escapeHtml(currentDate)}">
+                </div>
+                <div class="input-group">
+                    <label>Người kiểm tra</label>
+                    <input name="checked_by" value="${escapeHtml(currentUsername || "")}" readonly>
+                </div>
+            </div>
+            <div class="input-group">
+                <label>Ghi chú</label>
+                <textarea name="notes" rows="3">${escapeHtml(qc?.notes || "")}</textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Lưu kết quả QC</button>
+        </form>
+    </div>`;
+}
+
 function buildRollDetailHtml(data) {
     const roll = data.roll || {};
     const contract = data.contract || {};
@@ -286,7 +365,7 @@ function buildRollDetailHtml(data) {
         </div>
     `;
 
-    // --- Bảng chuẩn bị vật tư (material_preparations + items) ---
+    // --- Bảng chuẩn bị vật tư ---
     if (prep && prep.items && prep.items.length > 0) {
         html += `
         <div class="table-container" style="margin-top:20px">
@@ -308,13 +387,13 @@ function buildRollDetailHtml(data) {
         </div>`;
     }
 
-    // --- Bảng sản xuất thực tế: cột khác nhau theo product_type ---
+    // --- Bảng sản xuất thực tế ---
     html += buildProductionTableHtml(roll.product_type, data.production_info || []);
 
-    // --- Thông số kỹ thuật (plan_loose_tube / plan_sz / plan_jacket) ---
+    // --- Thông số kỹ thuật ---
     html += buildPlanInfoHtml(roll.product_type, data.plan);
 
-    // --- Bảng kiểm định QC ---
+    // --- Khối hiển thị kết quả QC (Chỉ đọc/chỉ hiển thị) ---
     if (qc) {
         const isPass = qc.quality_rating === "Đạt";
         html += `
@@ -327,6 +406,7 @@ function buildRollDetailHtml(data) {
         </div>`;
     }
 
+    // --- Form nhập liệu QC cho Admin/Inspector ---
     if (currentRole === "admin" || currentRole === "inspector") {
         html += buildQcFormHtml(roll, qc);
     }
@@ -350,7 +430,7 @@ function buildRollDetailHtml(data) {
         </div>`;
     }
 
-    // --- Lịch sử cập nhật (production_logs) ---
+    // --- Lịch sử cập nhật ---
     if (logs.length > 0) {
         html += `
         <div class="table-container" style="margin-top:20px">

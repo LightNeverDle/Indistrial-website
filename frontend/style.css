@@ -185,6 +185,78 @@ textarea::placeholder {
     color: var(--text-muted);
 }
 
+/* 1. Ẩn nút tăng giảm mặc định của trình duyệt (Dùng thuộc tính chuẩn + tiền tố) */
+.input-group input[type="number"]::-webkit-inner-spin-button,
+.input-group input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0;
+}
+
+.input-group input[type="number"] {
+    appearance: textfield; /* Chuẩn mới thay cho -moz-appearance */
+    -moz-appearance: textfield;
+}
+
+/* 2. Style wrapper & hiển thị nút tùy chỉnh rõ ràng */
+.number-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.number-input-wrapper input {
+    padding-right: 75px !important; /* Dành khoảng trống hiển thị 2 nút bên phải */
+}
+
+.number-input-wrapper input[type="number"] {
+    width: 100%;
+    padding-right: 75px !important; /* Dành khoảng trống 75px cho 2 nút */
+    box-sizing: border-box;
+}
+
+/* Cụm 2 nút bấm + - */
+.spin-buttons {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    z-index: 10; /* Tăng z-index để chắc chắn đè lên input */
+    pointer-events: auto; /* Đảm bảo nhận sự kiện click */
+}
+
+.spin-btn {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border-color);
+    background: var(--input-bg);
+    color: var(--text-main);
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    transition: all 0.2s ease;
+}
+
+.spin-btn:hover {
+    background: var(--primary-blue);
+    border-color: var(--primary-blue);
+    color: #ffffff;
+}
+
+.spin-btn:active {
+    transform: scale(0.92);
+}
+
 /* =========================================
    2. DASHBOARD LIGHT MODE
    ========================================= */
