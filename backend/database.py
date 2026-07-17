@@ -10,6 +10,7 @@
 # =====================================================================
 
 import os
+import json
 from datetime import datetime
 
 import pymysql
@@ -110,6 +111,65 @@ class Database:
                 cursor.execute("SHOW COLUMNS FROM cable_rolls LIKE 'checklist_status'")
                 if not cursor.fetchone():
                     cursor.execute("ALTER TABLE cable_rolls ADD COLUMN checklist_status VARCHAR(100) DEFAULT NULL")
+
+                cursor.execute("SHOW COLUMNS FROM sz_production_forms LIKE 'product_code'")
+                if not cursor.fetchone():
+                    cursor.execute("ALTER TABLE sz_production_forms ADD COLUMN product_code VARCHAR(100) DEFAULT NULL")
+                cursor.execute("SHOW COLUMNS FROM sz_production_forms LIKE 'machine'")
+                if not cursor.fetchone():
+                    cursor.execute("ALTER TABLE sz_production_forms ADD COLUMN machine VARCHAR(100) DEFAULT NULL")
+                cursor.execute("SHOW COLUMNS FROM sz_production_forms LIKE 'machine_speed'")
+                if not cursor.fetchone():
+                    cursor.execute("ALTER TABLE sz_production_forms ADD COLUMN machine_speed FLOAT DEFAULT NULL")
+                cursor.execute("SHOW COLUMNS FROM sz_production_forms LIKE 'sz_pitch'")
+                if not cursor.fetchone():
+                    cursor.execute("ALTER TABLE sz_production_forms ADD COLUMN sz_pitch VARCHAR(100) DEFAULT NULL")
+                cursor.execute("SHOW COLUMNS FROM sz_production_forms LIKE 'lay_direction'")
+                if not cursor.fetchone():
+                    cursor.execute("ALTER TABLE sz_production_forms ADD COLUMN lay_direction VARCHAR(100) DEFAULT NULL")
+                cursor.execute("SHOW COLUMNS FROM sz_production_forms LIKE 'tension'")
+                if not cursor.fetchone():
+                    cursor.execute("ALTER TABLE sz_production_forms ADD COLUMN tension VARCHAR(100) DEFAULT NULL")
+                cursor.execute("SHOW COLUMNS FROM sz_production_forms LIKE 'pull_speed'")
+                if not cursor.fetchone():
+                    cursor.execute("ALTER TABLE sz_production_forms ADD COLUMN pull_speed FLOAT DEFAULT NULL")
+                cursor.execute("SHOW COLUMNS FROM sz_production_forms LIKE 'post_braid_diameter'")
+                if not cursor.fetchone():
+                    cursor.execute("ALTER TABLE sz_production_forms ADD COLUMN post_braid_diameter FLOAT DEFAULT NULL")
+                cursor.execute("SHOW COLUMNS FROM sz_production_forms LIKE 'kcs_diameter'")
+                if not cursor.fetchone():
+                    cursor.execute("ALTER TABLE sz_production_forms ADD COLUMN kcs_diameter FLOAT DEFAULT NULL")
+                cursor.execute("SHOW COLUMNS FROM sz_production_forms LIKE 'kcs_uniformity'")
+                if not cursor.fetchone():
+                    cursor.execute("ALTER TABLE sz_production_forms ADD COLUMN kcs_uniformity VARCHAR(100) DEFAULT NULL")
+                cursor.execute("SHOW COLUMNS FROM sz_production_forms LIKE 'kcs_external_inspection'")
+                if not cursor.fetchone():
+                    cursor.execute("ALTER TABLE sz_production_forms ADD COLUMN kcs_external_inspection VARCHAR(255) DEFAULT NULL")
+                cursor.execute("SHOW COLUMNS FROM sz_production_forms LIKE 'kcs_notes'")
+                if not cursor.fetchone():
+                    cursor.execute("ALTER TABLE sz_production_forms ADD COLUMN kcs_notes TEXT DEFAULT NULL")
+
+                cursor.execute("SHOW COLUMNS FROM jacket_production_forms LIKE 'shift'")
+                if not cursor.fetchone():
+                    cursor.execute("ALTER TABLE jacket_production_forms ADD COLUMN shift VARCHAR(50) DEFAULT NULL")
+                cursor.execute("SHOW COLUMNS FROM jacket_production_forms LIKE 'bin'")
+                if not cursor.fetchone():
+                    cursor.execute("ALTER TABLE jacket_production_forms ADD COLUMN bin VARCHAR(100) DEFAULT NULL")
+                cursor.execute("SHOW COLUMNS FROM jacket_production_forms LIKE 'frp'")
+                if not cursor.fetchone():
+                    cursor.execute("ALTER TABLE jacket_production_forms ADD COLUMN frp VARCHAR(100) DEFAULT NULL")
+                cursor.execute("SHOW COLUMNS FROM jacket_production_forms LIKE 'kcs_measurements'")
+                if not cursor.fetchone():
+                    cursor.execute("ALTER TABLE jacket_production_forms ADD COLUMN kcs_measurements TEXT DEFAULT NULL")
+                cursor.execute("SHOW COLUMNS FROM jacket_production_forms LIKE 'measured_length'")
+                if not cursor.fetchone():
+                    cursor.execute("ALTER TABLE jacket_production_forms ADD COLUMN measured_length FLOAT DEFAULT NULL")
+                cursor.execute("SHOW COLUMNS FROM jacket_production_forms LIKE 'loss_result'")
+                if not cursor.fetchone():
+                    cursor.execute("ALTER TABLE jacket_production_forms ADD COLUMN loss_result VARCHAR(100) DEFAULT NULL")
+                cursor.execute("SHOW COLUMNS FROM jacket_production_forms LIKE 'measured_by'")
+                if not cursor.fetchone():
+                    cursor.execute("ALTER TABLE jacket_production_forms ADD COLUMN measured_by VARCHAR(100) DEFAULT NULL")
 
                 cursor.execute("SELECT COUNT(*) AS c FROM users")
                 if cursor.fetchone()["c"] == 0:
@@ -594,6 +654,639 @@ class Database:
         finally:
             conn.close()
 
+    def get_loose_tube_form_by_roll(self, roll_id):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "SELECT lf.*, u.username AS operator_name "
+                    "FROM loose_tube_forms lf "
+                    "LEFT JOIN users u ON u.id = lf.operator "
+                    "WHERE lf.roll_id=%s",
+                    (roll_id,),
+                )
+                return cursor.fetchone()
+        finally:
+            conn.close()
+
+    def get_sz_form_by_roll(self, roll_id):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "SELECT f.*, u.username AS operator_name "
+                    "FROM sz_production_forms f "
+                    "LEFT JOIN users u ON u.id = f.operator "
+                    "WHERE f.roll_id=%s",
+                    (roll_id,),
+                )
+                return cursor.fetchone()
+        finally:
+            conn.close()
+
+    def get_jacket_form_by_roll(self, roll_id):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "SELECT f.*, u.username AS operator_name "
+                    "FROM jacket_production_forms f "
+                    "LEFT JOIN users u ON u.id = f.operator "
+                    "WHERE f.roll_id=%s",
+                    (roll_id,),
+                )
+                return cursor.fetchone()
+        finally:
+            conn.close()
+
+    def get_jacket_kcs_form_by_roll(self, roll_id):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "SELECT f.*, u.username AS operator_name "
+                    "FROM jacket_kcs_forms f "
+                    "LEFT JOIN users u ON u.id = f.operator "
+                    "WHERE f.roll_id=%s",
+                    (roll_id,),
+                )
+                return cursor.fetchone()
+        finally:
+            conn.close()
+
+    def get_loose_tube_form_by_id(self, form_id):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "SELECT lf.*, u.username AS operator_name, cr.roll_code, c.contract_code, c.customer_name "
+                    "FROM loose_tube_forms lf "
+                    "JOIN cable_rolls cr ON cr.id = lf.roll_id "
+                    "JOIN contracts c ON c.id = cr.contract_id "
+                    "LEFT JOIN users u ON u.id = lf.operator "
+                    "WHERE lf.id=%s",
+                    (form_id,),
+                )
+                return cursor.fetchone()
+        finally:
+            conn.close()
+
+    def get_sz_form_by_id(self, form_id):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "SELECT f.*, u.username AS operator_name, cr.roll_code, c.contract_code, c.customer_name "
+                    "FROM sz_production_forms f "
+                    "JOIN cable_rolls cr ON cr.id = f.roll_id "
+                    "JOIN contracts c ON c.id = cr.contract_id "
+                    "LEFT JOIN users u ON u.id = f.operator "
+                    "WHERE f.id=%s",
+                    (form_id,),
+                )
+                return cursor.fetchone()
+        finally:
+            conn.close()
+
+    def get_jacket_form_by_id(self, form_id):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "SELECT f.*, u.username AS operator_name, cr.roll_code, c.contract_code, c.customer_name "
+                    "FROM jacket_production_forms f "
+                    "JOIN cable_rolls cr ON cr.id = f.roll_id "
+                    "JOIN contracts c ON c.id = cr.contract_id "
+                    "LEFT JOIN users u ON u.id = f.operator "
+                    "WHERE f.id=%s",
+                    (form_id,),
+                )
+                return cursor.fetchone()
+        finally:
+            conn.close()
+
+    def get_jacket_kcs_form_by_id(self, form_id):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "SELECT f.*, u.username AS operator_name, cr.roll_code, c.contract_code, c.customer_name "
+                    "FROM jacket_kcs_forms f "
+                    "JOIN cable_rolls cr ON cr.id = f.roll_id "
+                    "JOIN contracts c ON c.id = cr.contract_id "
+                    "LEFT JOIN users u ON u.id = f.operator "
+                    "WHERE f.id=%s",
+                    (form_id,),
+                )
+                return cursor.fetchone()
+        finally:
+            conn.close()
+
+    def create_loose_tube_form(self, roll_id, data, username):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT id, status, product_type FROM cable_rolls WHERE id=%s", (roll_id,))
+                roll = cursor.fetchone()
+                if not roll or roll["product_type"] != "loose_tube":
+                    return False
+
+                cursor.execute("SELECT id FROM users WHERE username=%s", (username,))
+                user = cursor.fetchone()
+                operator_id = user["id"] if user else None
+
+                production_date = data.get("production_date") or None
+                if production_date:
+                    production_date = datetime.fromisoformat(production_date).date()
+
+                cursor.execute("SELECT id FROM loose_tube_forms WHERE roll_id=%s", (roll_id,))
+                existing = cursor.fetchone()
+                if existing:
+                    cursor.execute(
+                        "UPDATE loose_tube_forms SET stt=%s, fiber_code=%s, shift=%s, tube_code=%s, "
+                        "machine_speed=%s, color=%s, fiber_count=%s, diameter=%s, length=%s, "
+                        "production_date=%s, bobbin_count=%s, operator=%s, notes=%s, form_status=%s "
+                        "WHERE roll_id=%s",
+                        (
+                            data.get("stt"),
+                            data.get("fiber_code"),
+                            data.get("shift"),
+                            data.get("tube_code"),
+                            data.get("machine_speed"),
+                            data.get("color"),
+                            data.get("fiber_count"),
+                            data.get("diameter"),
+                            data.get("length"),
+                            production_date,
+                            data.get("bobbin_count"),
+                            operator_id,
+                            data.get("notes"),
+                            "Đã nhập",
+                            roll_id,
+                        ),
+                    )
+                else:
+                    cursor.execute(
+                        "INSERT INTO loose_tube_forms (roll_id, stt, fiber_code, shift, tube_code, machine_speed, "
+                        "color, fiber_count, diameter, length, production_date, bobbin_count, operator, notes, form_status) "
+                        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                        (
+                            roll_id,
+                            data.get("stt"),
+                            data.get("fiber_code"),
+                            data.get("shift"),
+                            data.get("tube_code"),
+                            data.get("machine_speed"),
+                            data.get("color"),
+                            data.get("fiber_count"),
+                            data.get("diameter"),
+                            data.get("length"),
+                            production_date,
+                            data.get("bobbin_count"),
+                            operator_id,
+                            data.get("notes"),
+                            "Đã nhập",
+                        ),
+                    )
+
+                if roll["status"] == "pending":
+                    cursor.execute(
+                        "UPDATE cable_rolls SET status=%s WHERE id=%s",
+                        ("processing", roll_id),
+                    )
+
+                cursor.execute(
+                    "INSERT INTO production_logs (roll_id, stage, status, updated_by, updated_at, notes) "
+                    "VALUES (%s, %s, %s, %s, %s, %s)",
+                    (roll_id, "Đùn ống", "Đã nhập", operator_id, datetime.now(), "Lưu phiếu thông tin ống lỏng"),
+                )
+            conn.commit()
+            return True
+        finally:
+            conn.close()
+
+    def create_sz_form(self, roll_id, data, username):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT id, status, product_type FROM cable_rolls WHERE id=%s", (roll_id,))
+                roll = cursor.fetchone()
+                if not roll or roll["product_type"] != "sz":
+                    return False
+
+                cursor.execute("SELECT id FROM users WHERE username=%s", (username,))
+                user = cursor.fetchone()
+                operator_id = user["id"] if user else None
+
+                production_date = data.get("production_date") or None
+                if production_date:
+                    production_date = datetime.fromisoformat(production_date).date()
+
+                cursor.execute("SELECT id FROM sz_production_forms WHERE roll_id=%s", (roll_id,))
+                existing = cursor.fetchone()
+                if existing:
+                    cursor.execute(
+                        "UPDATE sz_production_forms SET stt=%s, product_code=%s, core_code=%s, shift=%s, production_date=%s, machine=%s, machine_speed=%s, length=%s, sz_pitch=%s, lay_direction=%s, tension=%s, pull_speed=%s, post_braid_diameter=%s, kcs_diameter=%s, kcs_uniformity=%s, kcs_external_inspection=%s, kcs_notes=%s, operator=%s, notes=%s, form_status=%s WHERE roll_id=%s",
+                        (
+                            data.get("stt"),
+                            data.get("product_code"),
+                            data.get("core_code"),
+                            data.get("shift"),
+                            production_date,
+                            data.get("machine"),
+                            data.get("machine_speed"),
+                            data.get("length"),
+                            data.get("sz_pitch"),
+                            data.get("lay_direction"),
+                            data.get("tension"),
+                            data.get("pull_speed"),
+                            data.get("post_braid_diameter"),
+                            data.get("kcs_diameter"),
+                            data.get("kcs_uniformity"),
+                            data.get("kcs_external_inspection"),
+                            data.get("kcs_notes"),
+                            operator_id,
+                            data.get("notes"),
+                            "Đã nhập",
+                            roll_id,
+                        ),
+                    )
+                else:
+                    cursor.execute(
+                        "INSERT INTO sz_production_forms (roll_id, stt, product_code, core_code, shift, production_date, machine, machine_speed, length, sz_pitch, lay_direction, tension, pull_speed, post_braid_diameter, kcs_diameter, kcs_uniformity, kcs_external_inspection, kcs_notes, operator, notes, form_status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                        (
+                            roll_id,
+                            data.get("stt"),
+                            data.get("product_code"),
+                            data.get("core_code"),
+                            data.get("shift"),
+                            production_date,
+                            data.get("machine"),
+                            data.get("machine_speed"),
+                            data.get("length"),
+                            data.get("sz_pitch"),
+                            data.get("lay_direction"),
+                            data.get("tension"),
+                            data.get("pull_speed"),
+                            data.get("post_braid_diameter"),
+                            data.get("kcs_diameter"),
+                            data.get("kcs_uniformity"),
+                            data.get("kcs_external_inspection"),
+                            data.get("kcs_notes"),
+                            operator_id,
+                            data.get("notes"),
+                            "Đã nhập",
+                        ),
+                    )
+
+                if roll["status"] == "pending":
+                    cursor.execute("UPDATE cable_rolls SET status=%s WHERE id=%s", ("processing", roll_id))
+
+                cursor.execute(
+                    "INSERT INTO production_logs (roll_id, stage, status, updated_by, updated_at, notes) VALUES (%s, %s, %s, %s, %s, %s)",
+                    (roll_id, "Bện SZ", "Đã nhập", operator_id, datetime.now(), "Lưu phiếu thông tin bện SZ"),
+                )
+            conn.commit()
+            return True
+        finally:
+            conn.close()
+
+    def create_jacket_form(self, roll_id, data, username):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT id, status, product_type FROM cable_rolls WHERE id=%s", (roll_id,))
+                roll = cursor.fetchone()
+                if not roll or roll["product_type"] != "jacket":
+                    return False
+
+                cursor.execute("SELECT id FROM users WHERE username=%s", (username,))
+                user = cursor.fetchone()
+                operator_id = user["id"] if user else None
+
+                manufacture_date = data.get("manufacture_date") or None
+                if manufacture_date:
+                    manufacture_date = datetime.fromisoformat(manufacture_date).date()
+
+                cursor.execute("SELECT id FROM jacket_production_forms WHERE roll_id=%s", (roll_id,))
+                existing = cursor.fetchone()
+                kcs_measurements = data.get("kcs_measurements")
+                if kcs_measurements is not None and not isinstance(kcs_measurements, str):
+                    kcs_measurements = json.dumps(kcs_measurements, ensure_ascii=False)
+
+                if existing:
+                    cursor.execute(
+                        "UPDATE jacket_production_forms SET stt=%s, cable_code=%s, core_code=%s, product_label=%s, length=%s, product_type=%s, shift=%s, manufacture_date=%s, bin=%s, frp=%s, bl1=%s, head_length=%s, tail_length=%s, kcs_measurements=%s, measured_length=%s, loss_result=%s, measured_by=%s, operator=%s, notes=%s, form_status=%s WHERE roll_id=%s",
+                        (
+                            data.get("stt"),
+                            data.get("cable_code"),
+                            data.get("core_code"),
+                            data.get("product_label"),
+                            data.get("length"),
+                            data.get("product_type"),
+                            data.get("shift"),
+                            manufacture_date,
+                            data.get("bin"),
+                            data.get("frp"),
+                            data.get("bl1"),
+                            data.get("head_length"),
+                            data.get("tail_length"),
+                            kcs_measurements,
+                            data.get("measured_length"),
+                            data.get("loss_result"),
+                            data.get("measured_by"),
+                            operator_id,
+                            data.get("notes"),
+                            "Đã nhập",
+                            roll_id,
+                        ),
+                    )
+                else:
+                    cursor.execute(
+                        "INSERT INTO jacket_production_forms (roll_id, stt, cable_code, core_code, product_label, length, product_type, shift, manufacture_date, bin, frp, bl1, head_length, tail_length, kcs_measurements, measured_length, loss_result, measured_by, operator, notes, form_status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                        (
+                            roll_id,
+                            data.get("stt"),
+                            data.get("cable_code"),
+                            data.get("core_code"),
+                            data.get("product_label"),
+                            data.get("length"),
+                            data.get("product_type"),
+                            data.get("shift"),
+                            manufacture_date,
+                            data.get("bin"),
+                            data.get("frp"),
+                            data.get("bl1"),
+                            data.get("head_length"),
+                            data.get("tail_length"),
+                            kcs_measurements,
+                            data.get("measured_length"),
+                            data.get("loss_result"),
+                            data.get("measured_by"),
+                            operator_id,
+                            data.get("notes"),
+                            "Đã nhập",
+                        ),
+                    )
+
+                if roll["status"] == "pending":
+                    cursor.execute("UPDATE cable_rolls SET status=%s WHERE id=%s", ("processing", roll_id))
+
+                cursor.execute(
+                    "INSERT INTO production_logs (roll_id, stage, status, updated_by, updated_at, notes) VALUES (%s, %s, %s, %s, %s, %s)",
+                    (roll_id, "Bọc vỏ", "Đã nhập", operator_id, datetime.now(), "Lưu phiếu thông tin bọc vỏ"),
+                )
+            conn.commit()
+            return True
+        finally:
+            conn.close()
+
+    def create_jacket_kcs_form(self, roll_id, data, username):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT id, status, product_type FROM cable_rolls WHERE id=%s", (roll_id,))
+                roll = cursor.fetchone()
+                if not roll or roll["product_type"] != "jacket":
+                    return False
+
+                cursor.execute("SELECT id FROM users WHERE username=%s", (username,))
+                user = cursor.fetchone()
+                operator_id = user["id"] if user else None
+
+                manufacture_date = data.get("manufacture_date") or None
+                if manufacture_date:
+                    manufacture_date = datetime.fromisoformat(manufacture_date).date()
+
+                cursor.execute("SELECT id FROM jacket_kcs_forms WHERE roll_id=%s", (roll_id,))
+                existing = cursor.fetchone()
+                if existing:
+                    cursor.execute(
+                        "UPDATE jacket_kcs_forms SET stt=%s, cable_code=%s, core_code=%s, product_label=%s, length=%s, product_type=%s, error_roll_code=%s, manufacture_date=%s, inspection_result=%s, inspection_notes=%s, operator=%s, notes=%s, form_status=%s WHERE roll_id=%s",
+                        (
+                            data.get("stt"),
+                            data.get("cable_code"),
+                            data.get("core_code"),
+                            data.get("product_label"),
+                            data.get("length"),
+                            data.get("product_type"),
+                            data.get("error_roll_code"),
+                            manufacture_date,
+                            data.get("inspection_result"),
+                            data.get("inspection_notes"),
+                            operator_id,
+                            data.get("notes"),
+                            "Đã nhập",
+                            roll_id,
+                        ),
+                    )
+                else:
+                    cursor.execute(
+                        "INSERT INTO jacket_kcs_forms (roll_id, stt, cable_code, core_code, product_label, length, product_type, error_roll_code, manufacture_date, inspection_result, inspection_notes, operator, notes, form_status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                        (
+                            roll_id,
+                            data.get("stt"),
+                            data.get("cable_code"),
+                            data.get("core_code"),
+                            data.get("product_label"),
+                            data.get("length"),
+                            data.get("product_type"),
+                            data.get("error_roll_code"),
+                            manufacture_date,
+                            data.get("inspection_result"),
+                            data.get("inspection_notes"),
+                            operator_id,
+                            data.get("notes"),
+                            "Đã nhập",
+                        ),
+                    )
+
+                if roll["status"] == "pending":
+                    cursor.execute("UPDATE cable_rolls SET status=%s WHERE id=%s", ("processing", roll_id))
+
+                cursor.execute(
+                    "INSERT INTO production_logs (roll_id, stage, status, updated_by, updated_at, notes) VALUES (%s, %s, %s, %s, %s, %s)",
+                    (roll_id, "KCS Bọc vỏ", "Đã nhập", operator_id, datetime.now(), "Lưu phiếu thông tin KCS bọc vỏ"),
+                )
+            conn.commit()
+            return True
+        finally:
+            conn.close()
+
+    def get_loose_tube_forms(self, roll_code=None, contract_code=None, worker=None, production_date=None, shift=None):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                query = (
+                    "SELECT lf.id, cr.roll_code, c.contract_code, c.customer_name, lf.shift, lf.production_date, "
+                    "u.username AS worker, lf.form_status, lf.created_at, lf.updated_at "
+                    "FROM loose_tube_forms lf "
+                    "JOIN cable_rolls cr ON cr.id = lf.roll_id "
+                    "JOIN contracts c ON c.id = cr.contract_id "
+                    "LEFT JOIN users u ON u.id = lf.operator "
+                    "WHERE 1=1"
+                )
+                params = []
+                if roll_code:
+                    query += " AND cr.roll_code LIKE %s"
+                    params.append(f"%{roll_code}%")
+                if contract_code:
+                    query += " AND c.contract_code LIKE %s"
+                    params.append(f"%{contract_code}%")
+                if worker:
+                    query += " AND u.username LIKE %s"
+                    params.append(f"%{worker}%")
+                if production_date:
+                    query += " AND lf.production_date = %s"
+                    params.append(production_date)
+                if shift:
+                    query += " AND lf.shift LIKE %s"
+                    params.append(f"%{shift}%")
+
+                query += " ORDER BY lf.updated_at DESC"
+                cursor.execute(query, tuple(params))
+                rows = cursor.fetchall()
+                for r in rows:
+                    if r.get("production_date"):
+                        r["production_date"] = str(r["production_date"])
+                    if r.get("created_at"):
+                        r["created_at"] = str(r["created_at"])
+                    if r.get("updated_at"):
+                        r["updated_at"] = str(r["updated_at"])
+                return rows
+        finally:
+            conn.close()
+
+    def get_sz_forms(self, roll_code=None, contract_code=None, worker=None, production_date=None, shift=None):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                query = (
+                    "SELECT f.id, cr.roll_code, c.contract_code, c.customer_name, f.shift, f.production_date, "
+                    "u.username AS worker, f.form_status, f.created_at, f.updated_at "
+                    "FROM sz_production_forms f "
+                    "JOIN cable_rolls cr ON cr.id = f.roll_id "
+                    "JOIN contracts c ON c.id = cr.contract_id "
+                    "LEFT JOIN users u ON u.id = f.operator "
+                    "WHERE 1=1"
+                )
+                params = []
+                if roll_code:
+                    query += " AND cr.roll_code LIKE %s"
+                    params.append(f"%{roll_code}%")
+                if contract_code:
+                    query += " AND c.contract_code LIKE %s"
+                    params.append(f"%{contract_code}%")
+                if worker:
+                    query += " AND u.username LIKE %s"
+                    params.append(f"%{worker}%")
+                if production_date:
+                    query += " AND f.production_date = %s"
+                    params.append(production_date)
+                if shift:
+                    query += " AND f.shift LIKE %s"
+                    params.append(f"%{shift}%")
+
+                query += " ORDER BY f.updated_at DESC"
+                cursor.execute(query, tuple(params))
+                rows = cursor.fetchall()
+                for r in rows:
+                    if r.get("production_date"):
+                        r["production_date"] = str(r["production_date"])
+                    if r.get("created_at"):
+                        r["created_at"] = str(r["created_at"])
+                    if r.get("updated_at"):
+                        r["updated_at"] = str(r["updated_at"])
+                return rows
+        finally:
+            conn.close()
+
+    def get_jacket_forms(self, roll_code=None, contract_code=None, worker=None, production_date=None, shift=None):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                query = (
+                    "SELECT f.id, cr.roll_code, c.contract_code, c.customer_name, f.shift, f.manufacture_date AS production_date, "
+                    "u.username AS worker, f.form_status, f.created_at, f.updated_at "
+                    "FROM jacket_production_forms f "
+                    "JOIN cable_rolls cr ON cr.id = f.roll_id "
+                    "JOIN contracts c ON c.id = cr.contract_id "
+                    "LEFT JOIN users u ON u.id = f.operator "
+                    "WHERE 1=1"
+                )
+                params = []
+                if roll_code:
+                    query += " AND cr.roll_code LIKE %s"
+                    params.append(f"%{roll_code}%")
+                if contract_code:
+                    query += " AND c.contract_code LIKE %s"
+                    params.append(f"%{contract_code}%")
+                if worker:
+                    query += " AND u.username LIKE %s"
+                    params.append(f"%{worker}%")
+                if production_date:
+                    query += " AND f.manufacture_date = %s"
+                    params.append(production_date)
+                if shift:
+                    query += " AND 1=0"
+
+                query += " ORDER BY f.updated_at DESC"
+                cursor.execute(query, tuple(params))
+                rows = cursor.fetchall()
+                for r in rows:
+                    if r.get("production_date"):
+                        r["production_date"] = str(r["production_date"])
+                    if r.get("created_at"):
+                        r["created_at"] = str(r["created_at"])
+                    if r.get("updated_at"):
+                        r["updated_at"] = str(r["updated_at"])
+                return rows
+        finally:
+            conn.close()
+
+    def get_jacket_kcs_forms(self, roll_code=None, contract_code=None, worker=None, production_date=None, shift=None):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                query = (
+                    "SELECT f.id, cr.roll_code, c.contract_code, c.customer_name, NULL AS shift, f.manufacture_date AS production_date, "
+                    "u.username AS worker, f.form_status, f.created_at, f.updated_at "
+                    "FROM jacket_kcs_forms f "
+                    "JOIN cable_rolls cr ON cr.id = f.roll_id "
+                    "JOIN contracts c ON c.id = cr.contract_id "
+                    "LEFT JOIN users u ON u.id = f.operator "
+                    "WHERE 1=1"
+                )
+                params = []
+                if roll_code:
+                    query += " AND cr.roll_code LIKE %s"
+                    params.append(f"%{roll_code}%")
+                if contract_code:
+                    query += " AND c.contract_code LIKE %s"
+                    params.append(f"%{contract_code}%")
+                if worker:
+                    query += " AND u.username LIKE %s"
+                    params.append(f"%{worker}%")
+                if production_date:
+                    query += " AND f.manufacture_date = %s"
+                    params.append(production_date)
+                if shift:
+                    query += " AND 1=0"
+
+                query += " ORDER BY f.updated_at DESC"
+                cursor.execute(query, tuple(params))
+                rows = cursor.fetchall()
+                for r in rows:
+                    if r.get("production_date"):
+                        r["production_date"] = str(r["production_date"])
+                    if r.get("created_at"):
+                        r["created_at"] = str(r["created_at"])
+                    if r.get("updated_at"):
+                        r["updated_at"] = str(r["updated_at"])
+                return rows
+        finally:
+            conn.close()
+
     # ================= CHI TIẾT 1 LÔ (roll) =================
 
     def get_roll_detail(self, roll_id):
@@ -643,6 +1336,17 @@ class Database:
                 )
                 qc_report = cursor.fetchone()
 
+                # Form sản xuất thực tế theo từng loại
+                production_form = None
+                if roll["product_type"] == "loose_tube":
+                    production_form = self.get_loose_tube_form_by_roll(roll_id)
+                elif roll["product_type"] == "sz":
+                    production_form = self.get_sz_form_by_roll(roll_id)
+                elif roll["product_type"] == "jacket":
+                    production_form = self.get_jacket_form_by_roll(roll_id)
+                    if not production_form:
+                        production_form = self.get_jacket_kcs_form_by_roll(roll_id)
+
                 # Inventory / warehouse record (nếu đã nhập kho)
                 cursor.execute(
                     "SELECT * FROM inventory WHERE roll_id=%s ORDER BY id DESC LIMIT 1",
@@ -669,7 +1373,7 @@ class Database:
                             d[k] = str(v)
                     return d
 
-                return {
+                result = {
                     "roll": stringify_dates(dict(roll)),
                     "inventory": stringify_dates(dict(inventory)) if inventory else None,
                     "contract": stringify_dates(dict(contract)) if contract else None,
@@ -677,8 +1381,14 @@ class Database:
                     "plan": stringify_dates(dict(plan)) if plan else None,
                     "production_info": [stringify_dates(dict(r)) for r in production_info],
                     "qc_report": stringify_dates(dict(qc_report)) if qc_report else None,
+                    "production_form": stringify_dates(dict(production_form)) if production_form else None,
                     "logs": [stringify_dates(dict(l)) for l in logs],
                 }
+
+                if roll["product_type"] == "loose_tube":
+                    result["loose_tube_form"] = stringify_dates(dict(production_form)) if production_form else None
+
+                return result
         finally:
             conn.close()
 

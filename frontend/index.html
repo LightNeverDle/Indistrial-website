@@ -66,6 +66,9 @@
                 <div class="nav-item" data-tab="rejected">
                     <i class="fa-solid fa-square-check"></i> Sản phẩm/công việc bị từ chối
                 </div>
+                <div class="nav-item hidden" id="admin-forms-nav" data-tab="forms">
+                    <i class="fa-solid fa-file-lines" style="color: #00f2fe;"></i> Quản lý phiếu sản xuất
+                </div>
                 <div class="nav-item hidden" id="admin-nav" data-tab="admin-panel">
                     <i class="fa-solid fa-user-gear" style="color: #00f2fe;"></i> Quản lý tài khoản
                 </div>
@@ -133,6 +136,64 @@
                             </thead>
                             <tbody id="user-table-body">
                                 </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <section id="forms-panel" class="admin-section hidden">
+                <div class="admin-card">
+                    <h3>📄 Danh sách Phiếu Thông Tin Sản Xuất</h3>
+                    <div class="form-grid" style="margin-bottom: 20px;">
+                        <div class="input-group">
+                            <label>Loại phiếu</label>
+                            <select id="form-type-select" class="modern-select">
+                                <option value="loose_tube">Ống lỏng</option>
+                                <option value="sz">Bện SZ</option>
+                                <option value="jacket">Bọc vỏ (OP)</option>
+                                <option value="jacket_kcs">Bọc vỏ (KCS)</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label>Tìm theo Roll</label>
+                            <input type="text" id="filter-roll-code" placeholder="Ví dụ: OL-59-2025">
+                        </div>
+                        <div class="input-group">
+                            <label>Tìm theo Contract</label>
+                            <input type="text" id="filter-contract-code" placeholder="Ví dụ: 59.2025">
+                        </div>
+                        <div class="input-group">
+                            <label>Tìm theo Worker</label>
+                            <input type="text" id="filter-worker" placeholder="Ví dụ: worker1">
+                        </div>
+                        <div class="input-group">
+                            <label>Ngày sản xuất</label>
+                            <input type="date" id="filter-production-date">
+                        </div>
+                        <div class="input-group">
+                            <label>Ca sản xuất</label>
+                            <input type="text" id="filter-shift" placeholder="Ví dụ: Ca sáng">
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px;">
+                        <button id="search-forms-btn" class="btn btn-primary" style="width:auto;">Tìm kiếm</button>
+                        <button id="reset-forms-btn" class="btn btn-secondary" style="width:auto;">Xóa bộ lọc</button>
+                    </div>
+                    <div style="overflow-x:auto;">
+                        <table class="forms-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Roll</th>
+                                    <th>Contract</th>
+                                    <th>Worker</th>
+                                    <th>Ngày SX</th>
+                                    <th>Ca SX</th>
+                                    <th>Trạng thái</th>
+                                    <th>Hành động</th>
+                                </tr>
+                            </thead>
+                            <tbody id="forms-table-body"></tbody>
                         </table>
                     </div>
                 </div>

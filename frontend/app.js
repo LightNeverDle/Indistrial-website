@@ -49,8 +49,19 @@ const loginScreen = document.getElementById("login-screen");
 const dashboardScreen = document.getElementById("dashboard-screen");
 const taskList = document.getElementById("task-list");
 const adminPanel = document.getElementById("admin-panel");
+const formsPanel = document.getElementById("forms-panel");
 const tabTitle = document.getElementById("tab-title");
 const adminNav = document.getElementById("admin-nav");
+const adminFormsNav = document.getElementById("admin-forms-nav");
+
+const filterRollCode = document.getElementById("filter-roll-code");
+const filterContractCode = document.getElementById("filter-contract-code");
+const filterWorker = document.getElementById("filter-worker");
+const filterProductionDate = document.getElementById("filter-production-date");
+const filterShift = document.getElementById("filter-shift");
+const formTypeSelect = document.getElementById("form-type-select");
+const searchFormsBtn = document.getElementById("search-forms-btn");
+const resetFormsBtn = document.getElementById("reset-forms-btn");
 
 // Tiêu đề hiển thị theo từng tab (khớp trạng thái cable_rolls.status)
 const TAB_TITLES = {
@@ -69,6 +80,37 @@ const PRODUCT_LABELS = {
 
 function productLabel(type) {
     return PRODUCT_LABELS[type] || type || "Không rõ";
+}
+
+const FORM_TYPE_CONFIG = {
+    loose_tube: {
+        label: "Ống lỏng",
+        listEndpoint: "/loose-tube-forms",
+        detailEndpoint: "/loose-tube-forms",
+        detailBuilder: buildLooseTubeFormDetailHtml,
+    },
+    sz: {
+        label: "Bện SZ",
+        listEndpoint: "/sz-forms",
+        detailEndpoint: "/sz-forms",
+        detailBuilder: buildSzFormDetailHtml,
+    },
+    jacket: {
+        label: "Bọc vỏ (OP)",
+        listEndpoint: "/jacket-forms",
+        detailEndpoint: "/jacket-forms",
+        detailBuilder: buildJacketFormDetailHtml,
+    },
+    jacket_kcs: {
+        label: "Bọc vỏ (KCS)",
+        listEndpoint: "/jacket-kcs-forms",
+        detailEndpoint: "/jacket-kcs-forms",
+        detailBuilder: buildJacketKcsFormDetailHtml,
+    },
+};
+
+function selectedFormType() {
+    return formTypeSelect ? formTypeSelect.value : "loose_tube";
 }
 
 function escapeHtml(value) {
@@ -94,11 +136,19 @@ document.querySelectorAll(".nav-item").forEach(item => {
             tabTitle.textContent = "Quản lý cấp phát tài khoản";
             taskList.classList.add("hidden");
             adminPanel.classList.remove("hidden");
+            formsPanel.classList.add("hidden");
             loadUsers();
+        } else if (tab === "forms") {
+            tabTitle.textContent = "Quản lý Phiếu Thông Tin Sản Xuất";
+            taskList.classList.add("hidden");
+            adminPanel.classList.add("hidden");
+            formsPanel.classList.remove("hidden");
+            loadForms();
         } else {
             currentTab = tab;
             taskList.classList.remove("hidden");
             adminPanel.classList.add("hidden");
+            formsPanel.classList.add("hidden");
             renderRolls(tab);
         }
     });
@@ -190,6 +240,9 @@ async function renderRolls(tab) {
                 ${checklistLine ? `<p><b>Checklist:</b> ${checklistLine} ${inventoryBadge}</p>` : ""}
                 <div style="margin-top:15px">
                     <button class="btn btn-secondary" onclick="showRollDetail(${roll.id})">Chi tiết</button>
+                                    ${roll.product_type === "loose_tube" ? `<button class="btn btn-secondary" onclick="showProductionFormModal(${roll.id})">Phiếu ống lỏng</button>` : ""}
+                    ${roll.product_type === "sz" ? `<button class="btn btn-secondary" onclick="showProductionFormModal(${roll.id})">Phiếu Bện SZ</button>` : ""}
+                    ${roll.product_type === "jacket" ? `<button class="btn btn-secondary" onclick="showProductionFormModal(${roll.id})">Phiếu Bọc Vỏ</button>` : ""}
                     ${renderStatusButton(roll)}
                 </div>
             `;
@@ -268,6 +321,7 @@ function buildRollDetailHtml(data) {
     const prep = data.material_preparation;
     const qc = data.qc_report;
     const logs = data.logs || [];
+    const productionForm = data.production_form;
 
     let html = `
         <div class="order-info">
@@ -314,7 +368,11 @@ function buildRollDetailHtml(data) {
     // --- Thông số kỹ thuật (plan_loose_tube / plan_sz / plan_jacket) ---
     html += buildPlanInfoHtml(roll.product_type, data.plan);
 
-    // --- Bảng kiểm định QC ---
+    // --- Bảng form sản xuất thực tế ---
+    if (productionForm) {
+        html += buildProductionFormView(roll.product_type, productionForm);
+    }
+
     if (qc) {
         const isPass = qc.quality_rating === "Đạt";
         html += `
@@ -603,8 +661,10 @@ document.getElementById("login-form").addEventListener("submit", async (e) => {
 
             if (result.role === "admin") {
                 adminNav.classList.remove("hidden");
+                adminFormsNav.classList.remove("hidden");
             } else {
                 adminNav.classList.add("hidden");
+                adminFormsNav.classList.add("hidden");
             }
 
             loginScreen.classList.add("hidden");
@@ -715,17 +775,937 @@ const ACTION_LABELS = {
     DELETE_USER: "Xóa tài khoản"
 };
 
-document.getElementById("view-audit-log-btn").addEventListener("click", () => {
-    showAuditLog("all");
+async function loadForms() {
+    const tbody = document.getElementById("forms-table-body");
+    const formType = selectedFormType();
+    const config = FORM_TYPE_CONFIG[formType] || FORM_TYPE_CONFIG.loose_tube;
+
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted);">Đang tải dữ liệu...</td></tr>`;
+    try {
+        const params = new URLSearchParams();
+        if (filterRollCode.value.trim()) params.append("roll_code", filterRollCode.value.trim());
+        if (filterContractCode.value.trim()) params.append("contract_code", filterContractCode.value.trim());
+        if (filterWorker.value.trim()) params.append("worker", filterWorker.value.trim());
+        if (filterProductionDate.value) params.append("production_date", filterProductionDate.value);
+        if (filterShift.value.trim()) params.append("shift", filterShift.value.trim());
+
+        const response = await fetch(`${API_URL}${config.listEndpoint}?${params.toString()}`, {
+            headers: { "Authorization": `Bearer ${authToken}` }
+        });
+        const forms = await response.json();
+        tbody.innerHTML = "";
+        if (!response.ok) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--error);">${forms.detail || "Lỗi tải dữ liệu."}</td></tr>`;
+            return;
+        }
+        if (!forms.length) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted);">Không tìm thấy phiếu nào.</td></tr>`;
+            return;
+        }
+        forms.forEach(form => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td>${form.id}</td>
+                <td>${escapeHtml(form.roll_code || "—")}</td>
+                <td>${escapeHtml(form.contract_code || "—")}</td>
+                <td>${escapeHtml(form.worker || "—")}</td>
+                <td>${escapeHtml(form.production_date || "—")}</td>
+                <td>${escapeHtml(form.shift || "—")}</td>
+                <td><span class="status-badge">${escapeHtml(form.form_status || "—")}</span></td>
+                <td><button class="btn btn-secondary" onclick="showFormDetail(${form.id})">Xem</button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--error);">Không thể kết nối máy chủ.</td></tr>`;
+    }
+}
+
+document.getElementById("search-forms-btn").addEventListener("click", (e) => {
+    e.preventDefault();
+    loadForms();
 });
 
-async function showAuditLog(role) {
+document.getElementById("reset-forms-btn").addEventListener("click", (e) => {
+    e.preventDefault();
+    filterRollCode.value = "";
+    filterContractCode.value = "";
+    filterWorker.value = "";
+    filterProductionDate.value = "";
+    filterShift.value = "";
+    loadForms();
+});
+
+if (formTypeSelect) {
+    formTypeSelect.addEventListener("change", () => {
+        loadForms();
+    });
+}
+
+const viewAuditLogBtn = document.getElementById("view-audit-log-btn");
+if (viewAuditLogBtn) {
+    viewAuditLogBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        showAuditLog("all");
+    });
+}
+
+function buildLooseTubeFormView(looseForm) {
+    return `
+    <div class="table-container" style="margin-top:20px">
+        <h3 style="margin-bottom:10px;">📝 Phiếu Thông Tin Ống Lỏng đã nhập</h3>
+        <div class="order-grid">
+            <div><b>STT</b><br>${escapeHtml(looseForm.stt || "—")}</div>
+            <div><b>Mã sợi</b><br>${escapeHtml(looseForm.fiber_code || "—")}</div>
+            <div><b>Ca sản xuất</b><br>${escapeHtml(looseForm.shift || "—")}</div>
+            <div><b>Mã ống lỏng</b><br>${escapeHtml(looseForm.tube_code || "—")}</div>
+            <div><b>Tốc độ máy</b><br>${looseForm.machine_speed != null ? looseForm.machine_speed + " m/min" : "—"}</div>
+            <div><b>Màu</b><br>${escapeHtml(looseForm.color || "—")}</div>
+            <div><b>Số sợi</b><br>${escapeHtml(looseForm.fiber_count || "—")}</div>
+            <div><b>Đường kính</b><br>${looseForm.diameter != null ? looseForm.diameter + " mm" : "—"}</div>
+            <div><b>Chiều dài</b><br>${looseForm.length != null ? looseForm.length + " m" : "—"}</div>
+            <div><b>Ngày sản xuất</b><br>${escapeHtml(looseForm.production_date || "—")}</div>
+            <div><b>Số bobbin</b><br>${escapeHtml(looseForm.bobbin_count || "—")}</div>
+            <div><b>Người nhập</b><br>${escapeHtml(looseForm.operator_name || "—")}</div>
+            <div style="grid-column: span 3;"><b>Ghi chú</b><br>${escapeHtml(looseForm.notes || "—")}</div>
+            <div><b>Trạng thái</b><br>${escapeHtml(looseForm.form_status || "—")}</div>
+        </div>
+    </div>`;
+}
+
+function buildSzFormView(form) {
+    return `
+    <div class="table-container" style="margin-top:20px">
+        <h3 style="margin-bottom:10px;">📝 Phiếu Thông Tin Bện SZ đã nhập</h3>
+        <div class="order-grid">
+            <div><b>STT</b><br>${escapeHtml(form.stt || "—")}</div>
+            <div><b>Mã lõi</b><br>${escapeHtml(form.core_code || "—")}</div>
+            <div><b>Ca sản xuất</b><br>${escapeHtml(form.shift || "—")}</div>
+            <div><b>Chiều dài</b><br>${form.length != null ? form.length + " m" : "—"}</div>
+            <div><b>Ống Dương</b><br>${escapeHtml(form.tube_duong || "—")}</div>
+            <div><b>Ống Cam</b><br>${escapeHtml(form.tube_cam || "—")}</div>
+            <div><b>Ống Lục</b><br>${escapeHtml(form.tube_luc || "—")}</div>
+            <div><b>Ống Nâu</b><br>${escapeHtml(form.tube_nau || "—")}</div>
+            <div><b>Filler</b><br>${escapeHtml(form.filler || "—")}</div>
+            <div><b>Ngày sản xuất</b><br>${escapeHtml(form.production_date || "—")}</div>
+            <div><b>Người nhập</b><br>${escapeHtml(form.operator_name || "—")}</div>
+            <div style="grid-column: span 3;"><b>Ghi chú</b><br>${escapeHtml(form.notes || "—")}</div>
+            <div><b>Trạng thái</b><br>${escapeHtml(form.form_status || "—")}</div>
+        </div>
+    </div>`;
+}
+
+function buildJacketFormView(form) {
+    return `
+    <div class="table-container" style="margin-top:20px">
+        <h3 style="margin-bottom:10px;">📝 Phiếu Thông Tin Bọc Vỏ đã nhập</h3>
+        <div class="order-grid">
+            <div><b>STT</b><br>${escapeHtml(form.stt || "—")}</div>
+            <div><b>Mã cuộn cáp</b><br>${escapeHtml(form.cable_code || "—")}</div>
+            <div><b>Mã lõi</b><br>${escapeHtml(form.core_code || "—")}</div>
+            <div><b>Thông tin vỏ cáp</b><br>${escapeHtml(form.product_label || "—")}</div>
+            <div><b>Chiều dài</b><br>${form.length != null ? form.length + " m" : "—"}</div>
+            <div><b>Loại sản phẩm</b><br>${escapeHtml(form.product_type || "—")}</div>
+            <div><b>Mã lô lỗi</b><br>${escapeHtml(form.error_roll_code || "—")}</div>
+            <div><b>Ngày sản xuất</b><br>${escapeHtml(form.manufacture_date || "—")}</div>
+            <div><b>BL1</b><br>${escapeHtml(form.bl1 || "—")}</div>
+            <div><b>Đầu</b><br>${form.head_length != null ? form.head_length + " m" : "—"}</div>
+            <div><b>Đuôi</b><br>${form.tail_length != null ? form.tail_length + " m" : "—"}</div>
+            <div><b>Người nhập</b><br>${escapeHtml(form.operator_name || "—")}</div>
+            <div style="grid-column: span 3;"><b>Ghi chú</b><br>${escapeHtml(form.notes || "—")}</div>
+            <div><b>Trạng thái</b><br>${escapeHtml(form.form_status || "—")}</div>
+        </div>
+    </div>`;
+}
+
+function buildJacketKcsFormView(form) {
+    return `
+    <div class="table-container" style="margin-top:20px">
+        <h3 style="margin-bottom:10px;">📝 Phiếu Thông Tin KCS Bọc Vỏ đã nhập</h3>
+        <div class="order-grid">
+            <div><b>STT</b><br>${escapeHtml(form.stt || "—")}</div>
+            <div><b>Mã cuộn cáp</b><br>${escapeHtml(form.cable_code || "—")}</div>
+            <div><b>Mã lõi</b><br>${escapeHtml(form.core_code || "—")}</div>
+            <div><b>Thông tin vỏ cáp</b><br>${escapeHtml(form.product_label || "—")}</div>
+            <div><b>Chiều dài</b><br>${form.length != null ? form.length + " m" : "—"}</div>
+            <div><b>Loại sản phẩm</b><br>${escapeHtml(form.product_type || "—")}</div>
+            <div><b>Mã lô lỗi</b><br>${escapeHtml(form.error_roll_code || "—")}</div>
+            <div><b>Ngày kiểm</b><br>${escapeHtml(form.manufacture_date || "—")}</div>
+            <div><b>Kết quả KCS</b><br>${escapeHtml(form.inspection_result || "—")}</div>
+            <div style="grid-column: span 3;"><b>Ghi chú KCS</b><br>${escapeHtml(form.inspection_notes || "—")}</div>
+            <div><b>Người nhập</b><br>${escapeHtml(form.operator_name || "—")}</div>
+            <div style="grid-column: span 3;"><b>Ghi chú tổng</b><br>${escapeHtml(form.notes || "—")}</div>
+            <div><b>Trạng thái</b><br>${escapeHtml(form.form_status || "—")}</div>
+        </div>
+    </div>`;
+}
+
+function buildProductionFormView(productType, form) {
+    if (productType === "loose_tube") return buildLooseTubeFormView(form);
+    if (productType === "sz") return buildSzFormView(form);
+    if (productType === "jacket") {
+        return form.inspection_result ? buildJacketKcsFormView(form) : buildJacketFormView(form);
+    }
+    return "";
+}
+
+async function showProductionFormModal(rollId) {
+    const modalBody = document.getElementById("detailBody");
+    modalBody.innerHTML = `<p style="text-align:center;">Đang tải phiếu sản xuất...</p>`;
+    document.getElementById("detailModal").style.display = "flex";
+
+    try {
+        const response = await fetch(`${API_URL}/rolls/${rollId}/detail`, {
+            headers: { "Authorization": `Bearer ${authToken}` }
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            modalBody.innerHTML = `<p style="color:var(--error)">${data.detail || "Không tải được dữ liệu."}</p>`;
+            return;
+        }
+
+        const roll = data.roll || {};
+        const form = data.production_form || {};
+        if (roll.product_type === "loose_tube") {
+            modalBody.innerHTML = buildLooseTubeFormEditor(roll, form);
+        } else if (roll.product_type === "sz") {
+            modalBody.innerHTML = buildSzFormEditor(roll, form);
+        } else if (roll.product_type === "jacket") {
+            if (form.inspection_result) {
+                modalBody.innerHTML = buildJacketKcsFormEditor(roll, form);
+            } else {
+                modalBody.innerHTML = buildJacketFormEditor(roll, form);
+            }
+        } else {
+            modalBody.innerHTML = `<p style="color:var(--error)">Loại phiếu không hỗ trợ.</p>`;
+        }
+    } catch (err) {
+        modalBody.innerHTML = `<p style="color:var(--error)">Không thể kết nối máy chủ.</p>`;
+    }
+}
+
+function buildLooseTubeFormEditor(roll, looseForm) {
+    const today = new Date().toISOString().slice(0, 10);
+    return `
+    <div class="order-info">
+        <div class="order-title">
+            <h2>📝 NHẬP PHIẾU ỐNG LỎNG</h2>
+            <span>${escapeHtml(roll.roll_code || "")}</span>
+        </div>
+        <div class="order-grid">
+            <div><b>Roll</b><br>${escapeHtml(roll.roll_code || "—")}</div>
+            <div><b>Loại</b><br>${escapeHtml(productLabel(roll.product_type))}</div>
+            <div><b>Trạng thái</b><br>${escapeHtml(roll.status || "—")}</div>
+        </div>
+    </div>
+    <form onsubmit="submitLooseTubeForm(event, ${roll.id})">
+        <div class="form-grid" style="margin-top:20px;">
+            <div class="input-group">
+                <label>STT</label>
+                <input type="number" name="stt" value="${escapeHtml(looseForm.stt || "")}">
+            </div>
+            <div class="input-group">
+                <label>Mã sợi</label>
+                <input name="fiber_code" value="${escapeHtml(looseForm.fiber_code || "")}">
+            </div>
+            <div class="input-group">
+                <label>Ca sản xuất</label>
+                <input name="shift" value="${escapeHtml(looseForm.shift || "")}">
+            </div>
+            <div class="input-group">
+                <label>Mã ống lỏng</label>
+                <input name="tube_code" value="${escapeHtml(looseForm.tube_code || "")}">
+            </div>
+            <div class="input-group">
+                <label>Tốc độ máy</label>
+                <input type="number" step="0.01" name="machine_speed" value="${escapeHtml(looseForm.machine_speed || "")}">
+            </div>
+            <div class="input-group">
+                <label>Màu</label>
+                <input name="color" value="${escapeHtml(looseForm.color || "")}">
+            </div>
+            <div class="input-group">
+                <label>Số sợi</label>
+                <input type="number" name="fiber_count" value="${escapeHtml(looseForm.fiber_count || "")}">
+            </div>
+            <div class="input-group">
+                <label>Đường kính</label>
+                <input type="number" step="0.01" name="diameter" value="${escapeHtml(looseForm.diameter || "")}">
+            </div>
+            <div class="input-group">
+                <label>Chiều dài (m)</label>
+                <input type="number" step="0.01" name="length" value="${escapeHtml(looseForm.length || "")}">
+            </div>
+            <div class="input-group">
+                <label>Ngày sản xuất</label>
+                <input type="date" name="production_date" value="${escapeHtml(looseForm.production_date || today)}">
+            </div>
+            <div class="input-group">
+                <label>Số bobbin</label>
+                <input type="number" name="bobbin_count" value="${escapeHtml(looseForm.bobbin_count || "")}">
+            </div>
+        </div>
+        <div class="input-group" style="margin-top:10px;">
+            <label>Ghi chú</label>
+            <textarea name="notes" rows="4">${escapeHtml(looseForm.notes || "")}</textarea>
+        </div>
+        <button type="submit" class="btn btn-primary" style="margin-top:20px;">Lưu phiếu</button>
+    </form>`;
+}
+
+function buildSzFormEditor(roll, szForm) {
+    const today = new Date().toISOString().slice(0, 10);
+    return `
+    <div class="order-info">
+        <div class="order-title">
+            <h2>📝 NHẬP PHIẾU BỆN SZ</h2>
+            <span>${escapeHtml(roll.roll_code || "")}</span>
+        </div>
+        <div class="order-grid">
+            <div><b>Roll</b><br>${escapeHtml(roll.roll_code || "—")}</div>
+            <div><b>Loại</b><br>${escapeHtml(productLabel(roll.product_type))}</div>
+            <div><b>Trạng thái</b><br>${escapeHtml(roll.status || "—")}</div>
+        </div>
+    </div>
+    <form onsubmit="submitSzForm(event, ${roll.id})">
+        <div class="form-grid" style="margin-top:20px;">
+            <div class="input-group">
+                <label>STT</label>
+                <input type="number" name="stt" value="${escapeHtml(szForm.stt || "")}">
+            </div>
+            <div class="input-group">
+                <label>Mã sản phẩm</label>
+                <input name="product_code" value="${escapeHtml(szForm.product_code || "")}">
+            </div>
+            <div class="input-group">
+                <label>Mã cuộn</label>
+                <input name="core_code" value="${escapeHtml(szForm.core_code || "")}">
+            </div>
+            <div class="input-group">
+                <label>Ca sản xuất</label>
+                <input name="shift" value="${escapeHtml(szForm.shift || "")}">
+            </div>
+            <div class="input-group">
+                <label>Ngày sản xuất</label>
+                <input type="date" name="production_date" value="${escapeHtml(szForm.production_date || today)}">
+            </div>
+            <div class="input-group">
+                <label>Máy bện SZ</label>
+                <input name="machine" value="${escapeHtml(szForm.machine || "")}">
+            </div>
+            <div class="input-group">
+                <label>Tốc độ máy</label>
+                <input type="number" step="0.01" name="machine_speed" value="${escapeHtml(szForm.machine_speed || "")}">
+            </div>
+            <div class="input-group">
+                <label>Chiều dài sản xuất (m)</label>
+                <input type="number" step="0.01" name="length" value="${escapeHtml(szForm.length || "")}">
+            </div>
+            <div class="input-group">
+                <label>Bước bện (SZ Pitch)</label>
+                <input name="sz_pitch" value="${escapeHtml(szForm.sz_pitch || "")}">
+            </div>
+            <div class="input-group">
+                <label>Hướng bện</label>
+                <input name="lay_direction" value="${escapeHtml(szForm.lay_direction || "")}">
+            </div>
+            <div class="input-group">
+                <label>Lực căng</label>
+                <input name="tension" value="${escapeHtml(szForm.tension || "")}">
+            </div>
+            <div class="input-group">
+                <label>Tốc độ kéo</label>
+                <input type="number" step="0.01" name="pull_speed" value="${escapeHtml(szForm.pull_speed || "")}">
+            </div>
+            <div class="input-group">
+                <label>Đường kính sau bện</label>
+                <input type="number" step="0.01" name="post_braid_diameter" value="${escapeHtml(szForm.post_braid_diameter || "")}">
+            </div>
+        </div>
+        <div class="form-grid" style="margin-top:20px;">
+            <div class="input-group">
+                <label>Đường kính KCS</label>
+                <input type="number" step="0.01" name="kcs_diameter" value="${escapeHtml(szForm.kcs_diameter || "")}">
+            </div>
+            <div class="input-group">
+                <label>Độ đồng đều</label>
+                <input name="kcs_uniformity" value="${escapeHtml(szForm.kcs_uniformity || "")}">
+            </div>
+            <div class="input-group">
+                <label>Kiểm tra ngoại quan</label>
+                <input name="kcs_external_inspection" value="${escapeHtml(szForm.kcs_external_inspection || "")}">
+            </div>
+            <div class="input-group" style="grid-column: span 3;">
+                <label>Ghi chú KCS</label>
+                <textarea name="kcs_notes" rows="4">${escapeHtml(szForm.kcs_notes || "")}</textarea>
+            </div>
+        </div>
+        <div class="input-group" style="margin-top:10px;">
+            <label>Ghi chú tổng</label>
+            <textarea name="notes" rows="4">${escapeHtml(szForm.notes || "")}</textarea>
+        </div>
+        <button type="submit" class="btn btn-primary" style="margin-top:20px;">Lưu phiếu</button>
+    </form>`;
+}
+
+function buildJacketFormEditor(roll, jacketForm) {
+    const today = new Date().toISOString().slice(0, 10);
+    return `
+    <div class="order-info">
+        <div class="order-title">
+            <h2>📝 NHẬP PHIẾU BỌC VỎ</h2>
+            <span>${escapeHtml(roll.roll_code || "")}</span>
+        </div>
+        <div class="order-grid">
+            <div><b>Roll</b><br>${escapeHtml(roll.roll_code || "—")}</div>
+            <div><b>Loại</b><br>${escapeHtml(productLabel(roll.product_type))}</div>
+            <div><b>Trạng thái</b><br>${escapeHtml(roll.status || "—")}</div>
+        </div>
+    </div>
+    <form onsubmit="submitJacketForm(event, ${roll.id})">
+        <div class="form-grid" style="margin-top:20px;">
+            <div class="input-group">
+                <label>STT</label>
+                <input type="number" name="stt" value="${escapeHtml(jacketForm.stt || "")}">
+            </div>
+            <div class="input-group">
+                <label>Mã số cáp thành phẩm</label>
+                <input name="cable_code" value="${escapeHtml(jacketForm.cable_code || "")}">
+            </div>
+            <div class="input-group">
+                <label>Mã số cuộn lõi</label>
+                <input name="core_code" value="${escapeHtml(jacketForm.core_code || "")}">
+            </div>
+            <div class="input-group">
+                <label>Thông tin vỏ cáp</label>
+                <input name="product_label" value="${escapeHtml(jacketForm.product_label || "")}">
+            </div>
+            <div class="input-group">
+                <label>Chủng loại sản phẩm</label>
+                <input name="product_type" value="${escapeHtml(jacketForm.product_type || "")}">
+            </div>
+            <div class="input-group">
+                <label>Ngày sản xuất</label>
+                <input type="date" name="manufacture_date" value="${escapeHtml(jacketForm.manufacture_date || today)}">
+            </div>
+            <div class="input-group">
+                <label>Ca sản xuất</label>
+                <input name="shift" value="${escapeHtml(jacketForm.shift || "")}">
+            </div>
+            <div class="input-group">
+                <label>Bin</label>
+                <input name="bin" value="${escapeHtml(jacketForm.bin || "")}">
+            </div>
+            <div class="input-group">
+                <label>FRP</label>
+                <input name="frp" value="${escapeHtml(jacketForm.frp || "")}">
+            </div>
+            <div class="input-group">
+                <label>Loại nhựa BL1</label>
+                <input name="bl1" value="${escapeHtml(jacketForm.bl1 || "")}">
+            </div>
+            <div class="input-group">
+                <label>Chiều dài đầu</label>
+                <input type="number" step="0.01" name="head_length" value="${escapeHtml(jacketForm.head_length || "")}">
+            </div>
+            <div class="input-group">
+                <label>Chiều dài cuối</label>
+                <input type="number" step="0.01" name="tail_length" value="${escapeHtml(jacketForm.tail_length || "")}">
+            </div>
+        </div>
+        <div class="order-info" style="margin-top:20px;">
+            <div class="order-title"><h3>📊 KCS</h3></div>
+        </div>
+        <div class="form-grid">
+            <div class="input-group">
+                <label>Chiều dài đo (m)</label>
+                <input type="number" step="0.01" name="measured_length" value="${escapeHtml(jacketForm.measured_length || "")}">
+            </div>
+            <div class="input-group">
+                <label>Kết quả suy hao</label>
+                <input name="loss_result" value="${escapeHtml(jacketForm.loss_result || "")}">
+            </div>
+            <div class="input-group">
+                <label>Người đo</label>
+                <input name="measured_by" value="${escapeHtml(jacketForm.measured_by || "")}">
+            </div>
+            <div class="input-group" style="grid-column: span 2;">
+                <label>Ghi chú</label>
+                <textarea name="notes" rows="4">${escapeHtml(jacketForm.notes || "")}</textarea>
+            </div>
+        </div>
+        <div class="order-info" style="margin-top:20px;">
+            <div class="order-title"><h3>🎨 KCS Theo Màu</h3></div>
+        </div>
+        <div class="kcs-measurements">
+            ${buildJacketKcsInputs(jacketForm)}
+        </div>
+        <button type="submit" class="btn btn-primary" style="margin-top:20px;">Lưu phiếu</button>
+    </form>`;
+}
+
+function buildJacketKcsInputs(jacketForm) {
+    const colors = ["Dương", "Cam", "Lục", "Nâu", "Xám", "Trắng"];
+    const jsonData = jacketForm.kcs_measurements ? parseJsonSafe(jacketForm.kcs_measurements) : {};
+
+    return colors.map(color => {
+        const group = jsonData[color] || Array.from({ length: 12 }, () => ({ loss_1310: "", loss_1550: "" }));
+        return `
+            <div class="kcs-group">
+                <h4>${color}</h4>
+                <div class="kcs-grid">
+                    <div><b>Sợi</b></div>
+                    <div><b>1310nm</b></div>
+                    <div><b>1550nm</b></div>
+                    ${group.map((fiber, idx) => `
+                        <div>${idx + 1}</div>
+                        <div><input type="number" step="0.01" name="kcs_${color}_1310_${idx}" value="${escapeHtml(fiber.loss_1310 || "")}"></div>
+                        <div><input type="number" step="0.01" name="kcs_${color}_1550_${idx}" value="${escapeHtml(fiber.loss_1550 || "")}"></div>
+                    `).join("")}
+                </div>
+            </div>
+        `;
+    }).join("");
+}
+
+function parseJsonSafe(value) {
+    if (!value) return {};
+    try {
+        return typeof value === "string" ? JSON.parse(value) : value;
+    } catch (e) {
+        return {};
+    }
+}
+
+function buildJacketKcsFormEditor(roll, jacketKcsForm) {
+    const today = new Date().toISOString().slice(0, 10);
+    return `
+    <div class="order-info">
+        <div class="order-title">
+            <h2>📝 NHẬP PHIẾU KCS BỌC VỎ</h2>
+            <span>${escapeHtml(roll.roll_code || "")}</span>
+        </div>
+        <div class="order-grid">
+            <div><b>Roll</b><br>${escapeHtml(roll.roll_code || "—")}</div>
+            <div><b>Loại</b><br>${escapeHtml(productLabel(roll.product_type))}</div>
+            <div><b>Trạng thái</b><br>${escapeHtml(roll.status || "—")}</div>
+        </div>
+    </div>
+    <form onsubmit="submitJacketKcsForm(event, ${roll.id})">
+        <div class="form-grid" style="margin-top:20px;">
+            <div class="input-group">
+                <label>STT</label>
+                <input type="number" name="stt" value="${escapeHtml(jacketKcsForm.stt || "")}">
+            </div>
+            <div class="input-group">
+                <label>Mã cuộn cáp</label>
+                <input name="cable_code" value="${escapeHtml(jacketKcsForm.cable_code || "")}">
+            </div>
+            <div class="input-group">
+                <label>Mã lõi</label>
+                <input name="core_code" value="${escapeHtml(jacketKcsForm.core_code || "")}">
+            </div>
+            <div class="input-group">
+                <label>Thông tin vỏ cáp</label>
+                <input name="product_label" value="${escapeHtml(jacketKcsForm.product_label || "")}">
+            </div>
+            <div class="input-group">
+                <label>Chiều dài (m)</label>
+                <input type="number" step="0.01" name="length" value="${escapeHtml(jacketKcsForm.length || "")}">
+            </div>
+            <div class="input-group">
+                <label>Loại sản phẩm</label>
+                <input name="product_type" value="${escapeHtml(jacketKcsForm.product_type || "")}">
+            </div>
+            <div class="input-group">
+                <label>Mã lô lỗi</label>
+                <input name="error_roll_code" value="${escapeHtml(jacketKcsForm.error_roll_code || "")}">
+            </div>
+            <div class="input-group">
+                <label>Ngày kiểm</label>
+                <input type="date" name="manufacture_date" value="${escapeHtml(jacketKcsForm.manufacture_date || today)}">
+            </div>
+            <div class="input-group">
+                <label>Kết quả KCS</label>
+                <input name="inspection_result" value="${escapeHtml(jacketKcsForm.inspection_result || "")}">
+            </div>
+            <div class="input-group" style="grid-column: span 2;">
+                <label>Ghi chú KCS</label>
+                <input name="inspection_notes" value="${escapeHtml(jacketKcsForm.inspection_notes || "")}">
+            </div>
+            <div class="input-group">
+                <label>BL1</label>
+                <input name="bl1" value="${escapeHtml(jacketKcsForm.bl1 || "")}">
+            </div>
+            <div class="input-group">
+                <label>Chiều đầu (m)</label>
+                <input type="number" step="0.01" name="head_length" value="${escapeHtml(jacketKcsForm.head_length || "")}">
+            </div>
+            <div class="input-group">
+                <label>Chiều đuôi (m)</label>
+                <input type="number" step="0.01" name="tail_length" value="${escapeHtml(jacketKcsForm.tail_length || "")}">
+            </div>
+        </div>
+        <div class="input-group" style="margin-top:10px;">
+            <label>Ghi chú</label>
+            <textarea name="notes" rows="4">${escapeHtml(jacketKcsForm.notes || "")}</textarea>
+        </div>
+        <button type="submit" class="btn btn-primary" style="margin-top:20px;">Lưu phiếu</button>
+    </form>`;
+}
+
+async function submitSzForm(event, rollId) {
+    event.preventDefault();
+    const form = event.target;
+    const payload = {
+        stt: form.stt.value ? Number(form.stt.value) : null,
+        product_code: form.product_code.value.trim() || null,
+        core_code: form.core_code.value.trim() || null,
+        shift: form.shift.value.trim() || null,
+        production_date: form.production_date.value || null,
+        machine: form.machine.value.trim() || null,
+        machine_speed: form.machine_speed.value ? Number(form.machine_speed.value) : null,
+        length: form.length.value ? Number(form.length.value) : null,
+        sz_pitch: form.sz_pitch.value.trim() || null,
+        lay_direction: form.lay_direction.value.trim() || null,
+        tension: form.tension.value.trim() || null,
+        pull_speed: form.pull_speed.value ? Number(form.pull_speed.value) : null,
+        post_braid_diameter: form.post_braid_diameter.value ? Number(form.post_braid_diameter.value) : null,
+        kcs_diameter: form.kcs_diameter.value ? Number(form.kcs_diameter.value) : null,
+        kcs_uniformity: form.kcs_uniformity.value.trim() || null,
+        kcs_external_inspection: form.kcs_external_inspection.value.trim() || null,
+        kcs_notes: form.kcs_notes.value.trim() || null,
+        notes: form.notes.value.trim() || null,
+    };
+
+    try {
+        const response = await fetch(`${API_URL}/rolls/${rollId}/sz-form`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${authToken}`
+            },
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        if (response.ok) {
+            alert(result.message || "Đã lưu phiếu thông tin Bện SZ.");
+            showRollDetail(rollId);
+            renderRolls(currentTab);
+        } else {
+            alert(result.detail || "Lưu phiếu thất bại.");
+        }
+    } catch (err) {
+        alert("Không thể kết nối máy chủ.");
+    }
+}
+
+async function submitJacketForm(event, rollId) {
+    event.preventDefault();
+    const form = event.target;
+    const payload = {
+        stt: form.stt.value ? Number(form.stt.value) : null,
+        cable_code: form.cable_code.value.trim() || null,
+        core_code: form.core_code.value.trim() || null,
+            product_label: form.product_label.value.trim() || null,
+        frp: form.frp.value.trim() || null,
+        bl1: form.bl1.value.trim() || null,
+        head_length: form.head_length.value ? Number(form.head_length.value) : null,
+        tail_length: form.tail_length.value ? Number(form.tail_length.value) : null,
+        measured_length: form.measured_length.value ? Number(form.measured_length.value) : null,
+        loss_result: form.loss_result.value.trim() || null,
+        measured_by: form.measured_by.value.trim() || null,
+        notes: form.notes.value.trim() || null,
+        kcs_measurements: collectJacketKcsMeasurements(form),
+    };
+
+    try {
+        const response = await fetch(`${API_URL}/rolls/${rollId}/jacket-form`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${authToken}`
+            },
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        if (response.ok) {
+            alert(result.message || "Đã lưu phiếu thông tin Bọc vỏ.");
+            showRollDetail(rollId);
+            renderRolls(currentTab);
+        } else {
+            alert(result.detail || "Lưu phiếu thất bại.");
+        }
+    } catch (err) {
+        alert("Không thể kết nối máy chủ.");
+    }
+}
+
+function collectJacketKcsMeasurements(form) {
+    const colors = ["Dương", "Cam", "Lục", "Nâu", "Xám", "Trắng"];
+    const result = {};
+    colors.forEach(color => {
+        const group = [];
+        for (let i = 0; i < 12; i++) {
+            group.push({
+                loss_1310: form[`kcs_${color}_1310_${i}`]?.value ? Number(form[`kcs_${color}_1310_${i}`].value) : null,
+                loss_1550: form[`kcs_${color}_1550_${i}`]?.value ? Number(form[`kcs_${color}_1550_${i}`].value) : null,
+            });
+        }
+        result[color] = group;
+    });
+    return result;
+}
+
+async function submitJacketKcsForm(event, rollId) {
+    event.preventDefault();
+    const form = event.target;
+    const payload = {
+        stt: form.stt.value ? Number(form.stt.value) : null,
+        cable_code: form.cable_code.value.trim() || null,
+        core_code: form.core_code.value.trim() || null,
+        product_label: form.product_label.value.trim() || null,
+        length: form.length.value ? Number(form.length.value) : null,
+        product_type: form.product_type.value.trim() || null,
+        error_roll_code: form.error_roll_code.value.trim() || null,
+        manufacture_date: form.manufacture_date.value || null,
+        inspection_result: form.inspection_result.value.trim() || null,
+        inspection_notes: form.inspection_notes.value.trim() || null,
+        bl1: form.bl1.value.trim() || null,
+        head_length: form.head_length.value ? Number(form.head_length.value) : null,
+        tail_length: form.tail_length.value ? Number(form.tail_length.value) : null,
+        notes: form.notes.value.trim() || null,
+    };
+
+    try {
+        const response = await fetch(`${API_URL}/rolls/${rollId}/jacket-kcs-form`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${authToken}`
+            },
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        if (response.ok) {
+            alert(result.message || "Đã lưu phiếu thông tin KCS Bọc vỏ.");
+            showRollDetail(rollId);
+            renderRolls(currentTab);
+        } else {
+            alert(result.detail || "Lưu phiếu thất bại.");
+        }
+    } catch (err) {
+        alert("Không thể kết nối máy chủ.");
+    }
+}
+
+async function submitLooseTubeForm(event, rollId) {
+    event.preventDefault();
+    const form = event.target;
+    const payload = {
+        stt: form.stt.value ? Number(form.stt.value) : null,
+        fiber_code: form.fiber_code.value.trim() || null,
+        shift: form.shift.value.trim() || null,
+        tube_code: form.tube_code.value.trim() || null,
+        machine_speed: form.machine_speed.value ? Number(form.machine_speed.value) : null,
+        color: form.color.value.trim() || null,
+        fiber_count: form.fiber_count.value ? Number(form.fiber_count.value) : null,
+        diameter: form.diameter.value ? Number(form.diameter.value) : null,
+        length: form.length.value ? Number(form.length.value) : null,
+        production_date: form.production_date.value || null,
+        bobbin_count: form.bobbin_count.value ? Number(form.bobbin_count.value) : null,
+        notes: form.notes.value.trim() || null,
+    };
+
+    try {
+        const response = await fetch(`${API_URL}/rolls/${rollId}/loose-tube-form`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${authToken}`
+            },
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        if (response.ok) {
+            alert(result.message || "Đã lưu phiếu thông tin ống lỏng.");
+            showRollDetail(rollId);
+            renderRolls(currentTab);
+        } else {
+            alert(result.detail || "Lưu phiếu thất bại.");
+        }
+    } catch (err) {
+        alert("Không thể kết nối máy chủ.");
+    }
+}
+
+async function showFormDetail(formId) {
+    const modalBody = document.getElementById("detailBody");
+    const formType = selectedFormType();
+    const config = FORM_TYPE_CONFIG[formType] || FORM_TYPE_CONFIG.loose_tube;
+
+    modalBody.innerHTML = `<p style="text-align:center;">Đang tải chi tiết phiếu...</p>`;
+    document.getElementById("detailModal").style.display = "flex";
+
+    try {
+        const response = await fetch(`${API_URL}${config.detailEndpoint}/${formId}`, {
+            headers: { "Authorization": `Bearer ${authToken}` }
+        });
+        const form = await response.json();
+        if (!response.ok) {
+            modalBody.innerHTML = `<p style="color:var(--error)">${form.detail || "Không tải được chi tiết."}</p>`;
+            return;
+        }
+        modalBody.innerHTML = config.detailBuilder(form);
+    } catch (err) {
+        modalBody.innerHTML = `<p style="color:var(--error)">Không thể kết nối máy chủ.</p>`;
+    }
+}
+
+function buildLooseTubeFormDetailHtml(form) {
+    return `
+    <div class="order-info">
+        <div class="order-title">
+            <h2>📄 CHI TIẾT PHIẾU ỐNG LỎNG</h2>
+            <span>Roll: ${escapeHtml(form.roll_code || "—")}</span>
+        </div>
+        <div class="order-grid">
+            <div><b>Contract</b><br>${escapeHtml(form.contract_code || "—")}</div>
+            <div><b>Khách hàng</b><br>${escapeHtml(form.customer_name || "—")}</div>
+            <div><b>Người khai</b><br>${escapeHtml(form.operator_name || "—")}</div>
+            <div><b>Trạng thái</b><br>${escapeHtml(form.form_status || "—")}</div>
+            <div><b>Ngày tạo</b><br>${escapeHtml(form.created_at || "—")}</div>
+            <div><b>Cập nhật</b><br>${escapeHtml(form.updated_at || "—")}</div>
+        </div>
+    </div>
+    <div class="order-info" style="margin-top:20px;">
+        <div class="order-grid">
+            <div><b>STT</b><br>${escapeHtml(form.stt || "—")}</div>
+            <div><b>Mã sợi</b><br>${escapeHtml(form.fiber_code || "—")}</div>
+            <div><b>Ca SX</b><br>${escapeHtml(form.shift || "—")}</div>
+            <div><b>Mã ống</b><br>${escapeHtml(form.tube_code || "—")}</div>
+            <div><b>Tốc độ máy</b><br>${form.machine_speed != null ? form.machine_speed + " m/min" : "—"}</div>
+            <div><b>Màu</b><br>${escapeHtml(form.color || "—")}</div>
+            <div><b>Số sợi</b><br>${escapeHtml(form.fiber_count || "—")}</div>
+            <div><b>Đường kính</b><br>${form.diameter != null ? form.diameter + " mm" : "—"}</div>
+            <div><b>Chiều dài</b><br>${form.length != null ? form.length + " m" : "—"}</div>
+            <div><b>Ngày SX</b><br>${escapeHtml(form.production_date || "—")}</div>
+            <div><b>Bobbin</b><br>${escapeHtml(form.bobbin_count || "—")}</div>
+            <div style="grid-column: span 3;"><b>Ghi chú</b><br>${escapeHtml(form.notes || "—")}</div>
+        </div>
+    </div>`;
+}
+
+function buildSzFormDetailHtml(form) {
+    return `
+    <div class="order-info">
+        <div class="order-title">
+            <h2>📄 CHI TIẾT PHIẾU BỆN SZ</h2>
+            <span>Roll: ${escapeHtml(form.roll_code || "—")}</span>
+        </div>
+        <div class="order-grid">
+            <div><b>Contract</b><br>${escapeHtml(form.contract_code || "—")}</div>
+            <div><b>Khách hàng</b><br>${escapeHtml(form.customer_name || "—")}</div>
+            <div><b>Người khai</b><br>${escapeHtml(form.operator_name || "—")}</div>
+            <div><b>Trạng thái</b><br>${escapeHtml(form.form_status || "—")}</div>
+            <div><b>Ngày tạo</b><br>${escapeHtml(form.created_at || "—")}</div>
+            <div><b>Cập nhật</b><br>${escapeHtml(form.updated_at || "—")}</div>
+        </div>
+    </div>
+    <div class="order-info" style="margin-top:20px;">
+        <div class="order-grid">
+            <div><b>STT</b><br>${escapeHtml(form.stt || "—")}</div>
+            <div><b>Mã lõi</b><br>${escapeHtml(form.core_code || "—")}</div>
+            <div><b>Ca SX</b><br>${escapeHtml(form.shift || "—")}</div>
+            <div><b>Chiều dài</b><br>${form.length != null ? form.length + " m" : "—"}</div>
+            <div><b>Ống Dương</b><br>${escapeHtml(form.tube_duong || "—")}</div>
+            <div><b>Ống Cam</b><br>${escapeHtml(form.tube_cam || "—")}</div>
+            <div><b>Ống Lục</b><br>${escapeHtml(form.tube_luc || "—")}</div>
+            <div><b>Ống Nâu</b><br>${escapeHtml(form.tube_nau || "—")}</div>
+            <div><b>Filler</b><br>${escapeHtml(form.filler || "—")}</div>
+            <div><b>Ngày SX</b><br>${escapeHtml(form.production_date || "—")}</div>
+            <div><b>Người nhập</b><br>${escapeHtml(form.operator_name || "—")}</div>
+            <div style="grid-column: span 3;"><b>Ghi chú</b><br>${escapeHtml(form.notes || "—")}</div>
+        </div>
+    </div>`;
+}
+
+function buildJacketFormDetailHtml(form) {
+    return `
+    <div class="order-info">
+        <div class="order-title">
+            <h2>📄 CHI TIẾT PHIẾU BỌC VỎ</h2>
+            <span>Roll: ${escapeHtml(form.roll_code || "—")}</span>
+        </div>
+        <div class="order-grid">
+            <div><b>Contract</b><br>${escapeHtml(form.contract_code || "—")}</div>
+            <div><b>Khách hàng</b><br>${escapeHtml(form.customer_name || "—")}</div>
+            <div><b>Người khai</b><br>${escapeHtml(form.operator_name || "—")}</div>
+            <div><b>Trạng thái</b><br>${escapeHtml(form.form_status || "—")}</div>
+            <div><b>Ngày tạo</b><br>${escapeHtml(form.created_at || "—")}</div>
+            <div><b>Cập nhật</b><br>${escapeHtml(form.updated_at || "—")}</div>
+        </div>
+    </div>
+    <div class="order-info" style="margin-top:20px;">
+        <div class="order-grid">
+            <div><b>STT</b><br>${escapeHtml(form.stt || "—")}</div>
+            <div><b>Mã cuộn</b><br>${escapeHtml(form.cable_code || "—")}</div>
+            <div><b>Mã lõi</b><br>${escapeHtml(form.core_code || "—")}</div>
+            <div><b>Thông tin vỏ cáp</b><br>${escapeHtml(form.product_label || "—")}</div>
+            <div><b>Chiều dài</b><br>${form.length != null ? form.length + " m" : "—"}</div>
+            <div><b>Loại sản phẩm</b><br>${escapeHtml(form.product_type || "—")}</div>
+            <div><b>Mã lô lỗi</b><br>${escapeHtml(form.error_roll_code || "—")}</div>
+            <div><b>Ngày SX</b><br>${escapeHtml(form.manufacture_date || "—")}</div>
+            <div><b>BL1</b><br>${escapeHtml(form.bl1 || "—")}</div>
+            <div><b>Chiều đầu</b><br>${form.head_length != null ? form.head_length + " m" : "—"}</div>
+            <div><b>Chiều đuôi</b><br>${form.tail_length != null ? form.tail_length + " m" : "—"}</div>
+            <div><b>Người nhập</b><br>${escapeHtml(form.operator_name || "—")}</div>
+            <div style="grid-column: span 3;"><b>Ghi chú</b><br>${escapeHtml(form.notes || "—")}</div>
+        </div>
+    </div>`;
+}
+
+function buildJacketKcsFormDetailHtml(form) {
+    return `
+    <div class="order-info">
+        <div class="order-title">
+            <h2>📄 CHI TIẾT PHIẾU KCS BỌC VỎ</h2>
+            <span>Roll: ${escapeHtml(form.roll_code || "—")}</span>
+        </div>
+        <div class="order-grid">
+            <div><b>Contract</b><br>${escapeHtml(form.contract_code || "—")}</div>
+            <div><b>Khách hàng</b><br>${escapeHtml(form.customer_name || "—")}</div>
+            <div><b>Người khai</b><br>${escapeHtml(form.operator_name || "—")}</div>
+            <div><b>Trạng thái</b><br>${escapeHtml(form.form_status || "—")}</div>
+            <div><b>Ngày tạo</b><br>${escapeHtml(form.created_at || "—")}</div>
+            <div><b>Cập nhật</b><br>${escapeHtml(form.updated_at || "—")}</div>
+        </div>
+    </div>
+    <div class="order-info" style="margin-top:20px;">
+        <div class="order-grid">
+            <div><b>STT</b><br>${escapeHtml(form.stt || "—")}</div>
+            <div><b>Mã cuộn</b><br>${escapeHtml(form.cable_code || "—")}</div>
+            <div><b>Mã lõi</b><br>${escapeHtml(form.core_code || "—")}</div>
+            <div><b>Thông tin vỏ cáp</b><br>${escapeHtml(form.product_label || "—")}</div>
+            <div><b>Chiều dài</b><br>${form.length != null ? form.length + " m" : "—"}</div>
+            <div><b>Loại sản phẩm</b><br>${escapeHtml(form.product_type || "—")}</div>
+            <div><b>Mã lô lỗi</b><br>${escapeHtml(form.error_roll_code || "—")}</div>
+            <div><b>Ngày SX</b><br>${escapeHtml(form.manufacture_date || "—")}</div>
+            <div><b>Kết quả KCS</b><br>${escapeHtml(form.inspection_result || "—")}</div>
+            <div style="grid-column: span 3;"><b>Ghi chú KCS</b><br>${escapeHtml(form.inspection_notes || "—")}</div>
+            <div><b>Người nhập</b><br>${escapeHtml(form.operator_name || "—")}</div>
+            <div style="grid-column: span 3;"><b>Ghi chú</b><br>${escapeHtml(form.notes || "—")}</div>
+        </div>
+    </div>`;
+}
+
+async function showAuditLog(role = "all") {
     const modalBody = document.getElementById("detailBody");
     modalBody.innerHTML = `<p style="text-align:center;">Đang tải nhật ký...</p>`;
     document.getElementById("detailModal").style.display = "flex";
 
     try {
-        const response = await fetch(`${API_URL}/audit-logs?role=${role}`, {
+        const response = await fetch(`${API_URL}/audit-logs?role=${encodeURIComponent(role)}`, {
             headers: { "Authorization": `Bearer ${authToken}` }
         });
         const logs = await response.json();

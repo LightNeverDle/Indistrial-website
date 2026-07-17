@@ -72,6 +72,76 @@ class SubmitQcModel(BaseModel):
     notes: Optional[str] = None
 
 
+class LooseTubeFormModel(BaseModel):
+    stt: Optional[int] = None
+    fiber_code: Optional[str] = None
+    shift: Optional[str] = None
+    tube_code: Optional[str] = None
+    machine_speed: Optional[float] = None
+    color: Optional[str] = None
+    fiber_count: Optional[int] = None
+    diameter: Optional[float] = None
+    length: Optional[float] = None
+    production_date: Optional[str] = None
+    bobbin_count: Optional[int] = None
+    notes: Optional[str] = None
+
+
+class SzFormModel(BaseModel):
+    stt: Optional[int] = None
+    product_code: Optional[str] = None
+    core_code: Optional[str] = None
+    shift: Optional[str] = None
+    production_date: Optional[str] = None
+    machine: Optional[str] = None
+    machine_speed: Optional[float] = None
+    length: Optional[float] = None
+    sz_pitch: Optional[str] = None
+    lay_direction: Optional[str] = None
+    tension: Optional[str] = None
+    pull_speed: Optional[float] = None
+    post_braid_diameter: Optional[float] = None
+    kcs_diameter: Optional[float] = None
+    kcs_uniformity: Optional[str] = None
+    kcs_external_inspection: Optional[str] = None
+    kcs_notes: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class JacketFormModel(BaseModel):
+    stt: Optional[int] = None
+    cable_code: Optional[str] = None
+    core_code: Optional[str] = None
+    product_label: Optional[str] = None
+    product_type: Optional[str] = None
+    shift: Optional[str] = None
+    manufacture_date: Optional[str] = None
+    bin: Optional[str] = None
+    frp: Optional[str] = None
+    bl1: Optional[str] = None
+    head_length: Optional[float] = None
+    tail_length: Optional[float] = None
+    kcs_measurements: Optional[dict] = None
+    measured_length: Optional[float] = None
+    loss_result: Optional[str] = None
+    measured_by: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class JacketKcsFormModel(BaseModel):
+    stt: Optional[int] = None
+    cable_code: Optional[str] = None
+    core_code: Optional[str] = None
+    product_label: Optional[str] = None
+    length: Optional[float] = None
+    product_type: Optional[str] = None
+    error_roll_code: Optional[str] = None
+    manufacture_date: Optional[str] = None
+    inspection_result: Optional[str] = None
+    inspection_notes: Optional[str] = None
+    notes: Optional[str] = None
+
+
 # ==========================
 # JWT
 # ==========================
@@ -227,6 +297,170 @@ def submit_qc_report(roll_id: int, data: SubmitQcModel, payload=Depends(verify_t
     )
 
     return {"status": "success", "message": "Đã lưu kết quả QC thành công."}
+
+
+@app.post("/api/rolls/{roll_id}/loose-tube-form")
+def submit_loose_tube_form(roll_id: int, data: LooseTubeFormModel, payload=Depends(verify_token)):
+    if payload.get("role") not in {"worker1", "worker2", "worker3", "admin"}:
+        raise HTTPException(status_code=403, detail="Bạn không có quyền nhập phiếu.")
+
+    payload_data = data.dict() if hasattr(data, "dict") else data.model_dump()
+    ok = db.create_loose_tube_form(roll_id, payload_data, payload["sub"])
+    if not ok:
+        raise HTTPException(status_code=404, detail="Không tìm thấy lô sản phẩm hoặc không phải ống lỏng.")
+
+    db.add_audit_log(
+        payload["sub"], payload.get("role"), "SUBMIT_LOOSE_TUBE_FORM",
+        target=f"roll#{roll_id}", description="Nhập phiếu thông tin ống lỏng"
+    )
+
+    return {"status": "success", "message": "Đã lưu phiếu thông tin ống lỏng."}
+
+
+@app.post("/api/rolls/{roll_id}/sz-form")
+def submit_sz_form(roll_id: int, data: SzFormModel, payload=Depends(verify_token)):
+    if payload.get("role") not in {"worker1", "worker2", "worker3", "admin"}:
+        raise HTTPException(status_code=403, detail="Bạn không có quyền nhập phiếu.")
+
+    payload_data = data.dict() if hasattr(data, "dict") else data.model_dump()
+    ok = db.create_sz_form(roll_id, payload_data, payload["sub"])
+    if not ok:
+        raise HTTPException(status_code=404, detail="Không tìm thấy lô sản phẩm hoặc không phải Bện SZ.")
+
+    db.add_audit_log(
+        payload["sub"], payload.get("role"), "SUBMIT_SZ_FORM",
+        target=f"roll#{roll_id}", description="Nhập phiếu thông tin Bện SZ"
+    )
+
+    return {"status": "success", "message": "Đã lưu phiếu thông tin Bện SZ."}
+
+
+@app.post("/api/rolls/{roll_id}/jacket-form")
+def submit_jacket_form(roll_id: int, data: JacketFormModel, payload=Depends(verify_token)):
+    if payload.get("role") not in {"worker1", "worker2", "worker3", "admin"}:
+        raise HTTPException(status_code=403, detail="Bạn không có quyền nhập phiếu.")
+
+    payload_data = data.dict() if hasattr(data, "dict") else data.model_dump()
+    ok = db.create_jacket_form(roll_id, payload_data, payload["sub"])
+    if not ok:
+        raise HTTPException(status_code=404, detail="Không tìm thấy lô sản phẩm hoặc không phải Bọc vỏ." )
+
+    db.add_audit_log(
+        payload["sub"], payload.get("role"), "SUBMIT_JACKET_FORM",
+        target=f"roll#{roll_id}", description="Nhập phiếu thông tin Bọc vỏ"
+    )
+
+    return {"status": "success", "message": "Đã lưu phiếu thông tin Bọc vỏ."}
+
+
+@app.post("/api/rolls/{roll_id}/jacket-kcs-form")
+def submit_jacket_kcs_form(roll_id: int, data: JacketKcsFormModel, payload=Depends(verify_token)):
+    if payload.get("role") not in {"worker1", "worker2", "worker3", "admin"}:
+        raise HTTPException(status_code=403, detail="Bạn không có quyền nhập phiếu.")
+
+    payload_data = data.dict() if hasattr(data, "dict") else data.model_dump()
+    ok = db.create_jacket_kcs_form(roll_id, payload_data, payload["sub"])
+    if not ok:
+        raise HTTPException(status_code=404, detail="Không tìm thấy lô sản phẩm hoặc không phải Bọc vỏ KCS." )
+
+    db.add_audit_log(
+        payload["sub"], payload.get("role"), "SUBMIT_JACKET_KCS_FORM",
+        target=f"roll#{roll_id}", description="Nhập phiếu thông tin KCS Bọc vỏ"
+    )
+
+    return {"status": "success", "message": "Đã lưu phiếu thông tin KCS Bọc vỏ."}
+
+
+@app.get("/api/loose-tube-forms")
+def get_loose_tube_forms(
+    roll_code: Optional[str] = None,
+    contract_code: Optional[str] = None,
+    worker: Optional[str] = None,
+    production_date: Optional[str] = None,
+    shift: Optional[str] = None,
+    payload=Depends(verify_admin_token)
+):
+    return db.get_loose_tube_forms(roll_code, contract_code, worker, production_date, shift)
+
+
+@app.get("/api/loose-tube-forms/{form_id}")
+def get_loose_tube_form_detail(form_id: int, payload=Depends(verify_admin_token)):
+    form = db.get_loose_tube_form_by_id(form_id)
+    if not form:
+        raise HTTPException(status_code=404, detail="Không tìm thấy phiếu thông tin ống lỏng.")
+    for k, v in form.items():
+        if hasattr(v, "isoformat"):
+            form[k] = str(v)
+    return form
+
+
+@app.get("/api/sz-forms")
+def get_sz_forms(
+    roll_code: Optional[str] = None,
+    contract_code: Optional[str] = None,
+    worker: Optional[str] = None,
+    production_date: Optional[str] = None,
+    shift: Optional[str] = None,
+    payload=Depends(verify_admin_token)
+):
+    return db.get_sz_forms(roll_code, contract_code, worker, production_date, shift)
+
+
+@app.get("/api/sz-forms/{form_id}")
+def get_sz_form_detail(form_id: int, payload=Depends(verify_admin_token)):
+    form = db.get_sz_form_by_id(form_id)
+    if not form:
+        raise HTTPException(status_code=404, detail="Không tìm thấy phiếu Bện SZ.")
+    for k, v in form.items():
+        if hasattr(v, "isoformat"):
+            form[k] = str(v)
+    return form
+
+
+@app.get("/api/jacket-forms")
+def get_jacket_forms(
+    roll_code: Optional[str] = None,
+    contract_code: Optional[str] = None,
+    worker: Optional[str] = None,
+    production_date: Optional[str] = None,
+    shift: Optional[str] = None,
+    payload=Depends(verify_admin_token)
+):
+    return db.get_jacket_forms(roll_code, contract_code, worker, production_date, shift)
+
+
+@app.get("/api/jacket-forms/{form_id}")
+def get_jacket_form_detail(form_id: int, payload=Depends(verify_admin_token)):
+    form = db.get_jacket_form_by_id(form_id)
+    if not form:
+        raise HTTPException(status_code=404, detail="Không tìm thấy phiếu Bọc vỏ.")
+    for k, v in form.items():
+        if hasattr(v, "isoformat"):
+            form[k] = str(v)
+    return form
+
+
+@app.get("/api/jacket-kcs-forms")
+def get_jacket_kcs_forms(
+    roll_code: Optional[str] = None,
+    contract_code: Optional[str] = None,
+    worker: Optional[str] = None,
+    production_date: Optional[str] = None,
+    shift: Optional[str] = None,
+    payload=Depends(verify_admin_token)
+):
+    return db.get_jacket_kcs_forms(roll_code, contract_code, worker, production_date, shift)
+
+
+@app.get("/api/jacket-kcs-forms/{form_id}")
+def get_jacket_kcs_form_detail(form_id: int, payload=Depends(verify_admin_token)):
+    form = db.get_jacket_kcs_form_by_id(form_id)
+    if not form:
+        raise HTTPException(status_code=404, detail="Không tìm thấy phiếu KCS Bọc vỏ.")
+    for k, v in form.items():
+        if hasattr(v, "isoformat"):
+            form[k] = str(v)
+    return form
 
 
 # ==========================
