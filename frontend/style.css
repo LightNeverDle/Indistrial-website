@@ -1,25 +1,28 @@
 :root {
     /* Light Mode Colors */
-    --bg-dark: #020617;
-    --sidebar-bg: #0f172a;
-    --main-content-bg: #020617;
-    --card-task: #1e293b;
-    --primary-neon: #00f2fe;
-    --accent-blue: #38bdf8;
-    --text-main: #f8fafc;
-    --text-secondary: #94a3b8;
-    --text-muted: #64748b;
+    --bg-main: #f8fafc;
+    --bg-dark: #f8fafc;
+    --sidebar-bg: #ffffff;
+    --main-content-bg: #f1f5f9;
+    --card-task: #ffffff;
+    --primary-neon: #0ea5e9;
+    --accent-blue: #0284c7;
+    --primary-blue: #2563eb;
+    --primary-purple: #7c3aed;
+    --text-main: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
     --error: #f43f5e;
     --success: #10b981;
-    --border-color: #334155;
-    --input-bg: #0f172a;
-    --primary-gradient: linear-gradient(135deg, #00f2fe 0%, #38bdf8 100%);
-    --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.4);
-    --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.5);
-    --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.6);
-    --shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.7);
-    --glass-bg: rgba(15, 23, 42, 0.95);
-    --hover-bg: rgba(0, 242, 254, 0.08);
+    --border-color: #e2e8f0;
+    --input-bg: #ffffff;
+    --primary-gradient: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
+    --shadow-sm: 0 2px 10px rgba(15, 23, 42, 0.06);
+    --shadow-md: 0 4px 20px rgba(15, 23, 42, 0.08);
+    --shadow-lg: 0 10px 40px rgba(15, 23, 42, 0.12);
+    --shadow-xl: 0 20px 60px rgba(15, 23, 42, 0.18);
+    --glass-bg: rgba(255, 255, 255, 0.95);
+    --hover-bg: rgba(2, 132, 199, 0.08);
 }
 
 * {
@@ -47,7 +50,7 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #a5b4fc 0%, #c4b5fd 100%);
     position: fixed;
     top: 0;
     left: 0;
@@ -146,7 +149,7 @@ body {
 .input-group input:focus {
     outline: none;
     border-color: var(--primary-blue);
-    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15);
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
     transform: translateY(-1px);
 }
 
@@ -331,13 +334,13 @@ textarea::placeholder {
 }
 
 .nav-item:hover {
-    background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(118, 75, 162, 0.08));
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(124, 58, 237, 0.08));
     color: var(--primary-blue);
     transform: translateX(5px);
 }
 
 .nav-item.active {
-    background: linear-gradient(135deg, rgba(102, 126, 234, 0.12), rgba(118, 75, 162, 0.12));
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(124, 58, 237, 0.12));
     color: var(--primary-blue);
     font-weight: 600;
     box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
@@ -357,7 +360,7 @@ textarea::placeholder {
 
 .sidebar-footer {
     padding: 20px;
-    background: rgba(102, 126, 234, 0.04);
+    background: rgba(37, 99, 235, 0.04);
     border-top: 2px solid var(--border-color);
 }
 
@@ -414,9 +417,9 @@ textarea::placeholder {
     font-weight: 600;
     letter-spacing: 0.5px;
     padding: 8px 16px;
-    background: rgba(104, 211, 145, 0.1);
+    background: rgba(16, 185, 129, 0.1);
     border-radius: 20px;
-    border: 1px solid rgba(104, 211, 145, 0.2);
+    border: 1px solid rgba(16, 185, 129, 0.2);
     animation: pulseDot 2s infinite;
 }
 
@@ -504,12 +507,12 @@ textarea::placeholder {
     color: white;
     padding: 14px;
     width: 100%;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
 }
 
 .btn-primary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 25px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 6px 25px rgba(37, 99, 235, 0.4);
 }
 
 .btn-primary:active {
@@ -558,7 +561,7 @@ textarea::placeholder {
 }
 
 .btn-danger-sm {
-    background: rgba(252, 129, 129, 0.1);
+    background: rgba(244, 63, 94, 0.08);
     border: 2px solid var(--error);
     color: var(--error);
     padding: 8px 16px;
@@ -623,7 +626,7 @@ textarea::placeholder {
 .inline-form input:focus {
     outline: none;
     border-color: var(--primary-blue);
-    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
 }
 
 .hidden-fields {
@@ -745,8 +748,7 @@ textarea::placeholder {
 
 .modern-select:focus {
     border-color: var(--primary-blue);
-    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15); /* Đồng bộ độ nhạt opacity 0.15 */
-    transform: translateY(-1px); /* Hiệu ứng nổi nhẹ giống input */
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
 }
 
 /* Style cho danh sách option sổ xuống */
@@ -774,7 +776,7 @@ textarea::placeholder {
 }
 
 .user-table th {
-    background: var(--sidebar-bg);
+    background: var(--main-content-bg);
     color: var(--text-secondary);
     font-size: 0.8rem;
     text-transform: uppercase;
@@ -788,12 +790,12 @@ textarea::placeholder {
 }
 
 .user-table tr:hover {
-    background: rgba(102, 126, 234, 0.04);
+    background: rgba(37, 99, 235, 0.04);
 }
 
 /* Delete Button */
 .btn-delete-task {
-    background: rgba(252, 129, 129, 0.1);
+    background: rgba(244, 63, 94, 0.08);
     border: 2px solid var(--error);
     color: var(--error);
     padding: 6px 14px;
@@ -879,7 +881,7 @@ textarea::placeholder {
     display:none;
     position:fixed;
     inset:0;
-    background:rgba(0,0,0,.65);
+    background:rgba(15, 23, 42, .5);
     justify-content:center;
     align-items:center;
     z-index:9999;
@@ -897,13 +899,13 @@ textarea::placeholder {
 
     overflow:auto;
 
-    background:#0f172a;
+    background:#ffffff;
 
     border-radius:12px;
 
     padding:25px;
 
-    color:white;
+    color:#0f172a;
 
 }
 
@@ -920,7 +922,7 @@ textarea::placeholder {
 
     margin-bottom:20px;
 
-    border-bottom:2px solid #334155;
+    border-bottom:2px solid #e2e8f0;
 
     padding-bottom:12px;
 
@@ -930,7 +932,7 @@ textarea::placeholder {
 
     margin:0;
 
-    color:#38bdf8;
+    color:#0284c7;
 
 }
 
@@ -965,13 +967,13 @@ textarea::placeholder {
 
 .order-grid div{
 
-    background:#1e293b;
+    background:#f1f5f9;
 
     padding:15px;
 
     border-radius:10px;
 
-    border-left:5px solid #38bdf8;
+    border-left:5px solid #0284c7;
 
     line-height:1.7;
 
@@ -979,7 +981,7 @@ textarea::placeholder {
 
 .order-grid b{
 
-    color:#94a3b8;
+    color:#475569;
 
 }
 
@@ -1016,7 +1018,7 @@ textarea::placeholder {
 
     padding:12px;
 
-    border:1px solid #334155;
+    border:1px solid #e2e8f0;
 
     position:sticky;
 
@@ -1030,7 +1032,7 @@ textarea::placeholder {
 
     padding:10px;
 
-    border:1px solid #334155;
+    border:1px solid #e2e8f0;
 
     text-align:center;
 
@@ -1038,19 +1040,19 @@ textarea::placeholder {
 
 .detail-table tbody tr:nth-child(even){
 
-    background:#111827;
+    background:#f8fafc;
 
 }
 
 .detail-table tbody tr:nth-child(odd){
 
-    background:#1f2937;
+    background:#ffffff;
 
 }
 
 .detail-table tbody tr:hover{
 
-    background:#334155;
+    background:#e2e8f0;
 
 }
 
@@ -1083,9 +1085,9 @@ textarea::placeholder {
 }
 
 .stage-badge {
-    background: rgba(56, 189, 248, 0.15);
+    background: rgba(2, 132, 199, 0.1);
     color: var(--accent-blue);
-    border: 1px solid rgba(56, 189, 248, 0.4);
+    border: 1px solid rgba(2, 132, 199, 0.3);
 }
 
 
@@ -1095,7 +1097,7 @@ textarea::placeholder {
 
     margin-top:25px;
 
-    background:#1e293b;
+    background:#fffbeb;
 
     padding:20px;
 
@@ -1109,6 +1111,6 @@ textarea::placeholder {
 
     margin-top:0;
 
-    color:#fbbf24;
+    color:#d97706;
 
 }
